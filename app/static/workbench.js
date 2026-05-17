@@ -358,10 +358,291 @@ function setupComparePlayerASearch() {
   });
 }
 
+function renderPlayerSearchResult(player) {
+  const rank = player.overall_rank ? `Rank #${escHtml(player.overall_rank)}` : "Qualified";
+  const team = player.latest_team_abbr || "NBA";
+  const games = player.games_sampled ? `${player.games_sampled} games` : "5+ games";
+  return `
+    <button class="player-search-result" type="button" data-player-id="${escHtml(player.player_id)}">
+      ${renderHeadshot(player)}
+      <span>
+        <strong>${escHtml(player.player_name)}</strong>
+        <span class="meta">${escHtml(team)} · ${escHtml(games)}</span>
+      </span>
+      <span class="status">${rank}</span>
+    </button>
+  `;
+}
+
+async function runQualifiedPlayerSearch(formNode, query, { navigateFirst = false } = {}) {
+  const resultsEl = formNode.querySelector("[data-player-search-results]");
+  if (!(resultsEl instanceof HTMLElement)) {
+    return;
+  }
+  try {
+    const response = await fetch(`/api/players/search?q=${encodeURIComponent(query)}`);
+    const data = await response.json();
+    if (!response.ok) {
+      resultsEl.innerHTML = `<div class="empty-state"><strong>${escHtml(data.detail || "Search failed")}</strong></div>`;
+      resultsEl.hidden = false;
+      return;
+    }
+    const items = Array.isArray(data.items) ? data.items : [];
+    if (navigateFirst && items[0]) {
+      globalThis.location.href = `/players/${items[0].player_id}`;
+      return;
+    }
+    if (items.length === 0) {
+      resultsEl.innerHTML = '<div class="empty-state"><strong>No qualified players found.</strong></div>';
+      resultsEl.hidden = false;
+      return;
+    }
+    resultsEl.innerHTML = items.map(renderPlayerSearchResult).join("");
+    resultsEl.hidden = false;
+    resultsEl.querySelectorAll("[data-player-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        globalThis.location.href = `/players/${button.dataset.playerId}`;
+      });
+    });
+  } catch {
+    resultsEl.innerHTML = '<div class="empty-state"><strong>Search failed.</strong></div>';
+    resultsEl.hidden = false;
+  }
+}
+
+function setupQualifiedPlayerSearch() {
+  document.querySelectorAll("[data-player-search-form]").forEach((formNode) => {
+    if (!(formNode instanceof HTMLFormElement)) {
+      return;
+    }
+    const input = formNode.querySelector("[data-player-search-input]");
+    const resultsEl = formNode.querySelector("[data-player-search-results]");
+    if (!(input instanceof HTMLInputElement) || !(resultsEl instanceof HTMLElement)) {
+      return;
+    }
+    let searchTimeout = null;
+    input.addEventListener("input", () => {
+      clearTimeout(searchTimeout);
+      const query = input.value.trim();
+      if (query.length < 2) {
+        resultsEl.hidden = true;
+        return;
+      }
+      searchTimeout = setTimeout(() => runQualifiedPlayerSearch(formNode, query), 220);
+    });
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        resultsEl.hidden = true;
+      }
+    });
+    formNode.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const query = input.value.trim();
+      if (query) {
+        runQualifiedPlayerSearch(formNode, query, { navigateFirst: true });
+      }
+    });
+  });
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (target instanceof Element && target.closest("[data-player-search-form]")) {
+      return;
+    }
+    document.querySelectorAll("[data-player-search-results]").forEach((resultsEl) => {
+      if (resultsEl instanceof HTMLElement) {
+        resultsEl.hidden = true;
+      }
+    });
+  });
+}
+
+function setupTabs() {
+  document.querySelectorAll("[data-tab-group]").forEach((group) => {
+    const buttons = Array.from(group.querySelectorAll("[data-tab-target]"));
+    const panels = Array.from(group.querySelectorAll("[data-tab-panel]"));
+    const activate = (targetName) => {
+      buttons.forEach((button) => {
+        const isActive = button.dataset.tabTarget === targetName;
+        button.classList.toggle("is-active", isActive);
+        button.setAttribute("aria-selected", isActive ? "true" : "false");
+      });
+      panels.forEach((panel) => {
+        const isActive = panel.dataset.tabPanel === targetName;
+        panel.classList.toggle("is-active", isActive);
+        panel.hidden = !isActive;
+      });
+    };
+    buttons.forEach((button) => {
+      button.addEventListener("click", () => activate(button.dataset.tabTarget));
+    });
+  });
+}
+
+const TREND_STATS = {
+  pts: { label: "PTS" },
+  reb: { label: "REB" },
+  ast: { label: "AST" },
+  stl: { label: "STL" },
+  blk: { label: "BLK" },
+  tov: { label: "TOV" },
+};
+
+function formatChartNumber(value) {
+  if (!Number.isFinite(value)) {
+    return "";
+  }
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function buildTrendTooltip(point, stat, baselineValue, width) {
+  const tooltipWidth = 154;
+  const tooltipHeight = baselineValue === null ? 42 : 56;
+  const x = Math.min(width - tooltipWidth - 8, Math.max(8, point.x - tooltipWidth / 2));
+  const y = point.y - tooltipHeight - 12 < 8 ? point.y + 14 : point.y - tooltipHeight - 12;
+  const baselineText =
+    baselineValue === null
+      ? ""
+      : `<text class="trend-tooltip-text" x="${x + 10}" y="${y + 47}">Lg avg ${formatChartNumber(baselineValue)}</text>`;
+  return `
+    <g class="trend-tooltip">
+      <rect class="trend-tooltip-box" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${tooltipWidth}" height="${tooltipHeight}" rx="8" />
+      <text class="trend-tooltip-text" x="${x + 10}" y="${y + 18}">${escHtml(point.date)}</text>
+      <text class="trend-tooltip-text" x="${x + 10}" y="${y + 33}">${escHtml(stat.label)} ${formatChartNumber(point.value)}</text>
+      ${baselineText}
+    </g>
+  `;
+}
+
+function buildTrendSvg(games, statKey, baselines = {}) {
+  const stat = TREND_STATS[statKey] || TREND_STATS.pts;
+  const baselineValue = Number(baselines[statKey]?.value);
+  const hasBaseline = Number.isFinite(baselineValue);
+  const values = games
+    .map((game, index) => ({
+      index,
+      date: game.game_date,
+      value: Number(game[statKey]),
+    }))
+    .filter((point) => Number.isFinite(point.value));
+  if (values.length === 0) {
+    return '<div class="empty-state"><strong>No trend data available.</strong></div>';
+  }
+
+  const width = 720;
+  const height = 250;
+  const pad = { top: 26, right: 28, bottom: 46, left: 46 };
+  const innerWidth = width - pad.left - pad.right;
+  const innerHeight = height - pad.top - pad.bottom;
+  const maxValue = Math.max(
+    ...values.map((point) => point.value),
+    hasBaseline ? baselineValue : 0,
+    1
+  );
+  const yMax = Math.max(1, Math.ceil(maxValue * 1.15));
+  const bottom = pad.top + innerHeight;
+  const points = values.map((point, index) => {
+    const x =
+      values.length === 1
+        ? pad.left + innerWidth / 2
+        : pad.left + (index / (values.length - 1)) * innerWidth;
+    const y = bottom - (point.value / yMax) * innerHeight;
+    return { ...point, x, y };
+  });
+  const linePoints = points.map((point) => `${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(" ");
+  const areaPoints = `${pad.left},${bottom} ${linePoints} ${points[points.length - 1].x.toFixed(1)},${bottom}`;
+  const baselineY = hasBaseline
+    ? bottom - (baselineValue / yMax) * innerHeight
+    : null;
+  const baselineLabelY = hasBaseline ? Math.max(14, baselineY - 7) : null;
+  const baselineMarkup = hasBaseline
+    ? `
+      <line class="trend-baseline" x1="${pad.left}" y1="${baselineY.toFixed(1)}" x2="${width - pad.right}" y2="${baselineY.toFixed(1)}" />
+      <text class="trend-baseline-label" x="${width - pad.right}" y="${baselineLabelY.toFixed(1)}" text-anchor="end">League avg ${formatChartNumber(baselineValue)}</text>
+    `
+    : "";
+  const grid = [0, 0.25, 0.5, 0.75, 1]
+    .map((ratio) => {
+      const y = bottom - ratio * innerHeight;
+      const label = Math.round(yMax * ratio);
+      return `
+        <line x1="${pad.left}" y1="${y.toFixed(1)}" x2="${width - pad.right}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.08)" />
+        <text class="trend-axis" x="12" y="${(y + 4).toFixed(1)}">${label}</text>
+      `;
+    })
+    .join("");
+  const dots = points
+    .map(
+      (point) => `
+        <g class="trend-point" tabindex="0" aria-label="${escHtml(point.date)} ${escHtml(stat.label)} ${formatChartNumber(point.value)}">
+          <circle class="trend-dot" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="5" />
+          ${buildTrendTooltip(point, stat, hasBaseline ? baselineValue : null, width)}
+        </g>
+      `
+    )
+    .join("");
+  const firstDate = values[0]?.date || "";
+  const lastDate = values[values.length - 1]?.date || "";
+
+  return `
+    <svg role="img" aria-label="${escHtml(stat.label)} game trend" viewBox="0 0 ${width} ${height}">
+      ${grid}
+      <polygon class="trend-area" points="${areaPoints}" />
+      ${baselineMarkup}
+      <polyline class="trend-line" points="${linePoints}" />
+      ${dots}
+      <text class="trend-label" x="${pad.left}" y="${height - 16}">${escHtml(firstDate)}</text>
+      <text class="trend-label" text-anchor="end" x="${width - pad.right}" y="${height - 16}">${escHtml(lastDate)}</text>
+      <text class="trend-label" text-anchor="middle" x="${width / 2}" y="18">${escHtml(stat.label)}</text>
+    </svg>
+  `;
+}
+
+function setupPlayerTrendCharts() {
+  document.querySelectorAll("[data-player-trend-chart]").forEach((chart) => {
+    if (!(chart instanceof HTMLElement)) {
+      return;
+    }
+    const dataNode = chart.querySelector("[data-trend-data]");
+    const baselineNode = chart.querySelector("[data-baseline-data]");
+    let games = [];
+    let baselines = {};
+    try {
+      games = JSON.parse(dataNode?.textContent || "[]");
+    } catch {
+      games = [];
+    }
+    try {
+      baselines = JSON.parse(baselineNode?.textContent || "{}");
+    } catch {
+      baselines = {};
+    }
+    const group = chart.closest("[data-tab-group]") || document;
+    const controls = group.querySelector("[data-player-trend-controls]");
+    const render = (statKey) => {
+      chart.innerHTML = buildTrendSvg(games, statKey, baselines);
+    };
+    if (controls) {
+      controls.querySelectorAll("[data-stat-key]").forEach((button) => {
+        button.addEventListener("click", () => {
+          controls.querySelectorAll("[data-stat-key]").forEach((item) => {
+            item.classList.toggle("is-active", item === button);
+          });
+          render(button.dataset.statKey || "pts");
+        });
+      });
+    }
+    render("pts");
+  });
+}
+
 export function initWorkbench() {
   setupTrackButtons();
   setupCompareSearch();
   setupComparePlayerASearch();
+  setupQualifiedPlayerSearch();
+  setupTabs();
+  setupPlayerTrendCharts();
   const storage = getStorage();
   if (!storage) {
     return;

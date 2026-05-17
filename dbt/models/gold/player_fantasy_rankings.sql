@@ -22,6 +22,11 @@ with joined as (
         c.category_score_6cat,
         c.category_score_7cat,
         c.category_coverage_status,
+        c.games_sampled,
+        c.qualification_games,
+        c.is_qualified,
+        c.sample_status,
+        c.sample_warning,
         c.z_pts,
         c.z_reb,
         c.z_ast,
@@ -61,6 +66,18 @@ select
     team_abbr,
     latest_game_date,
     season_games,
+    coalesce(games_sampled, season_games, 0) as games_sampled,
+    coalesce(qualification_games, 5) as qualification_games,
+    coalesce(is_qualified, season_games >= 5) as is_qualified,
+    coalesce(
+        sample_status,
+        case
+            when season_games >= 10 then 'ready'
+            when season_games >= 5 then 'limited_sample'
+            else 'insufficient_sample'
+        end
+    ) as sample_status,
+    sample_warning,
     avg_min_last_5,
     fantasy_points_last_3,
     fantasy_points_last_5,
@@ -127,3 +144,4 @@ select
     next_7d_games as games_next_7d,
     next_7d_back_to_backs as back_to_backs_next_7d
 from scored
+where coalesce(is_qualified, season_games >= 5)

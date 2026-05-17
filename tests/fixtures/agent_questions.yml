@@ -1,0 +1,54 @@
+# Starter eval questions for the Ask NBA Stats agent.
+# Edit this file to add questions you want Codex/tests to exercise.
+#
+# Fields:
+# - id: stable machine-readable name for the question
+# - question: the user-facing question to ask the agent
+# - expected_tools: tool names the agent should generally use
+# - expected_terms: words or phrases that should appear in the answer
+
+- id: top_assists
+  question: "Who are the top 10 players by assists per game?"
+  expected_tools:
+    - search_rankings
+  expected_terms:
+    - "AST"
+    - "assists"
+
+- id: lebron_percentile
+  question: "Which percentille is LeBron's points attribruted (points + assists * 2) in the league amongst players who played at least 100 games?"
+  expected_tools:
+    - resolve_player
+    - calculate_player_percentile
+  expected_terms:
+    - "Lebron James"
+    - "PTS"
+    - "AST"
+
+- id: maxey_similar_players
+  question: "Who are the most similar players to Tyrese Maxey?"
+  expected_tools:
+    - resolve_player
+    - find_similar_players
+  expected_terms:
+    - "Tyrese Maxey"
+    - "similar"
+
+- id: lebron_recent_scoring
+  question: "Show LeBron James' recent scoring trend against the league average."
+  expected_tools:
+    - resolve_player
+    - get_player_trends
+  expected_terms:
+    - "LeBron"
+    - "PTS"
+
+- id: lebron_game_by_game_attributed_points
+  question: "Show LeBron's recent game-by-game Attributed Points trend"
+  expected_tools:
+    - resolve_player
+    - get_player_game_log
+  expected_terms:
+    - "LeBron"
+    - "Attributed Points"
+    - "PTS + AST * 2"

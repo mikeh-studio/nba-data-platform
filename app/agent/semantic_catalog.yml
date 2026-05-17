@@ -1,0 +1,111 @@
+metrics:
+  pts:
+    label: PTS
+    description: Points per game across qualified 2025-26 players.
+    aliases: [points, point, ppg, scoring]
+    game_log_key: pts
+    trend_stat: PTS
+    detail_average_key: season_avg_pts
+    baseline_key: league_avg_pts
+    percentile_key: pts_percentile
+    leaderboard_column: avg_pts
+    direction: higher
+  reb:
+    label: REB
+    description: Rebounds per game across qualified 2025-26 players.
+    aliases: [rebounds, rebound, rbs, boards]
+    game_log_key: reb
+    trend_stat: REB
+    detail_average_key: season_avg_reb
+    baseline_key: league_avg_reb
+    percentile_key: reb_percentile
+    leaderboard_column: avg_reb
+    direction: higher
+  ast:
+    label: AST
+    description: Assists per game across qualified 2025-26 players.
+    aliases: [assists, assist, playmaking]
+    game_log_key: ast
+    trend_stat: AST
+    detail_average_key: season_avg_ast
+    baseline_key: league_avg_ast
+    percentile_key: ast_percentile
+    leaderboard_column: avg_ast
+    direction: higher
+  stl:
+    label: STL
+    description: Steals per game across qualified 2025-26 players.
+    aliases: [steals, steal]
+    game_log_key: stl
+    trend_stat: STL
+    detail_average_key: season_avg_stl
+    baseline_key: league_avg_stl
+    percentile_key: stl_percentile
+    leaderboard_column: avg_stl
+    direction: higher
+  blk:
+    label: BLK
+    description: Blocks per game across qualified 2025-26 players.
+    aliases: [blocks, block, blcks]
+    game_log_key: blk
+    trend_stat: BLK
+    detail_average_key: season_avg_blk
+    baseline_key: league_avg_blk
+    percentile_key: blk_percentile
+    leaderboard_column: avg_blk
+    direction: higher
+  tov:
+    label: TOV
+    description: Turnovers per game, ranked as ball security where fewer is better.
+    aliases: [turnovers, turnover, tos, ball_security]
+    game_log_key: tov
+    trend_stat: TOV
+    detail_average_key: season_avg_tov
+    baseline_key: league_avg_tov
+    percentile_key: tov_percentile
+    leaderboard_column: avg_tov
+    direction: lower
+  fg3m:
+    label: 3PM
+    description: Made threes per game across qualified 2025-26 players.
+    aliases: [threes, three_pointers, 3pm, three_point_makes]
+    game_log_key: fg3m
+    trend_stat: FG3M
+    detail_average_key: season_avg_fg3m
+    baseline_key:
+    percentile_key:
+    leaderboard_column: avg_fg3m
+    direction: higher
+  min:
+    label: MIN
+    description: Minutes per game across qualified 2025-26 players.
+    aliases: [minutes, playing_time, mpg]
+    game_log_key: min
+    trend_stat: MIN
+    detail_average_key:
+    baseline_key:
+    percentile_key:
+    leaderboard_column: avg_min
+    direction: higher
+  fantasy_points_simple:
+    label: BSI
+    description: Simple box-score index used by this project as a fantasy proxy.
+    aliases: [fantasy, fantasy_proxy, box_score_index, bsi]
+    game_log_key: fantasy_points_simple
+    trend_stat: FANTASY_POINTS_SIMPLE
+    detail_average_key:
+    baseline_key:
+    percentile_key:
+    leaderboard_column: avg_fantasy_points_simple
+    direction: higher
+  points_created:
+    label: Attributed Points
+    description: Derived offensive points estimate calculated as PTS + AST * 2.
+    aliases: [points_created, points_attributed, attributed_points, points_plus_assists_times_two, points + assists * 2, pts_plus_ast_x2]
+    formula: "pts + ast * 2"
+    trend_stat: POINTS_CREATED
+    detail_average_key:
+    baseline_key:
+    percentile_key:
+    leaderboard_column:
+    direction: higher

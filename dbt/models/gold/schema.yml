@@ -303,6 +303,36 @@ models:
           - accepted_values:
               arguments:
                 values: ['partial_until_fg_ft_available']
+      - name: sample_status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['ready', 'limited_sample', 'insufficient_sample']
+      - name: is_qualified
+        tests: [not_null]
+  - name: player_search_index
+    columns:
+      - name: player_id
+        tests:
+          - not_null
+          - unique
+          - relationships:
+              arguments:
+                to: ref('dim_player')
+                field: player_id
+      - name: player_name
+        tests: [not_null]
+      - name: latest_season
+        tests: [not_null]
+      - name: is_qualified
+        tests: [not_null]
+      - name: sample_status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['ready', 'limited_sample']
   - name: player_opportunity_outlook
     columns:
       - name: player_id
@@ -353,6 +383,19 @@ models:
         tests:
           - not_null
           - unique
+      - name: is_qualified
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true]
+                quote: false
+      - name: sample_status
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['ready', 'limited_sample']
       - name: recommendation_tier
         tests:
           - accepted_values:

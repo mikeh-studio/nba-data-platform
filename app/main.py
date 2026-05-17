@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel, Field
 
+from app.agent.service import AgentDisabledError, AgentExecutionError, StatsAgent
 from app.config import SUPPORTED_SEASON, Settings, get_settings
 from app.repository import (
     BigQueryWarehouseRepository,
@@ -27,6 +29,11 @@ from app.telemetry import (
 BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 TRACKING_CAP = 8
+
+
+class AgentAskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+    conversation_id: str | None = Field(default=None, max_length=80)
 
 
 def _time_ago(value: str | None) -> str:
@@ -62,6 +69,10 @@ def get_repository(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> WarehouseRepository:
     return BigQueryWarehouseRepository(settings)
+
+
+def get_agent_client() -> Any | None:
+    return None
 
 
 @app.get("/api/leaderboard")
@@ -209,11 +220,62 @@ def api_player_game_log(
     player_id: int,
     repo: Annotated[WarehouseRepository, Depends(get_repository)],
     limit: int = Query(30, ge=1, le=82),
+    start_date: date | None = Query(None),
+    end_date: date | None = Query(None),
 ) -> dict:
-    result = repo.get_player_game_log(player_id, limit=limit)
+    if start_date is not None and end_date is not None and start_date > end_date:
+        raise HTTPException(
+            status_code=400,
+            detail="start_date must be on or before end_date",
+        )
+    result = repo.get_player_game_log(
+        player_id,
+        limit=limit,
+        start_date=start_date.isoformat() if start_date is not None else None,
+        end_date=end_date.isoformat() if end_date is not None else None,
+    )
     if result is None:
         raise HTTPException(status_code=404, detail="Player not found")
     return {"season": SUPPORTED_SEASON, "item": result}
+
+
+@app.post("/api/agent/ask")
+def api_agent_ask(
+    payload: AgentAskRequest,
+    repo: Annotated[WarehouseRepository, Depends(get_repository)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    agent_client: Annotated[Any | None, Depends(get_agent_client)],
+) -> dict:
+    question = payload.question.strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Question must not be blank")
+    agent = StatsAgent(settings, repo, client=agent_client)
+    try:
+        answer = agent.answer(question, conversation_id=payload.conversation_id)
+    except AgentDisabledError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except AgentExecutionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"season": SUPPORTED_SEASON, **answer}
+
+
+@app.get("/ask", response_class=HTMLResponse)
+def ask_page(
+    request: Request,
+    repo: Annotated[WarehouseRepository, Depends(get_repository)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> HTMLResponse:
+    health = repo.get_health()
+    context = {
+        "request": request,
+        "page_title": "Ask NBA Stats",
+        "season": SUPPORTED_SEASON,
+        "health": health,
+        "tracking_cap": TRACKING_CAP,
+        "agent_enabled": settings.openai_agent_enabled,
+        "agent_configured": bool(settings.openai_api_key),
+    }
+    return templates.TemplateResponse(request, "ask.html", context)
 
 
 @app.get("/visualize", response_class=HTMLResponse)

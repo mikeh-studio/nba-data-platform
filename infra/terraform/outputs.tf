@@ -18,6 +18,10 @@ output "gold_dataset_id" {
   value = google_bigquery_dataset.gold.dataset_id
 }
 
+output "agent_dataset_id" {
+  value = google_bigquery_dataset.agent.dataset_id
+}
+
 output "metadata_dataset_id" {
   value = google_bigquery_dataset.metadata.dataset_id
 }

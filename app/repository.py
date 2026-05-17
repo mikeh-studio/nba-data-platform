@@ -8,6 +8,8 @@ from typing import Any, Literal, Protocol
 from google.api_core.exceptions import GoogleAPIError as BQAPIError
 from google.cloud import bigquery
 
+from app.agent.catalog import load_semantic_catalog
+from app.agent.formulas import FormulaError, compile_formula_sql
 from app.config import SUPPORTED_SEASON, Settings
 
 STATE_FRESH = "fresh"
@@ -138,6 +140,159 @@ SIMILARITY_TRAIT_LABELS: dict[str, str] = {
     "minutes_delta_vs_season": "minutes trend",
 }
 
+STAT_PERCENTILE_CONFIG: tuple[dict[str, str], ...] = (
+    {
+        "key": "pts",
+        "label": "PTS",
+        "average_field": "season_avg_pts",
+        "percentile_field": "pts_percentile",
+        "baseline_field": "league_avg_pts",
+        "direction": "higher",
+    },
+    {
+        "key": "reb",
+        "label": "REB",
+        "average_field": "season_avg_reb",
+        "percentile_field": "reb_percentile",
+        "baseline_field": "league_avg_reb",
+        "direction": "higher",
+    },
+    {
+        "key": "ast",
+        "label": "AST",
+        "average_field": "season_avg_ast",
+        "percentile_field": "ast_percentile",
+        "baseline_field": "league_avg_ast",
+        "direction": "higher",
+    },
+    {
+        "key": "stl",
+        "label": "STL",
+        "average_field": "season_avg_stl",
+        "percentile_field": "stl_percentile",
+        "baseline_field": "league_avg_stl",
+        "direction": "higher",
+    },
+    {
+        "key": "blk",
+        "label": "BLK",
+        "average_field": "season_avg_blk",
+        "percentile_field": "blk_percentile",
+        "baseline_field": "league_avg_blk",
+        "direction": "higher",
+    },
+    {
+        "key": "tov",
+        "label": "Ball Security",
+        "average_field": "season_avg_tov",
+        "percentile_field": "tov_percentile",
+        "baseline_field": "league_avg_tov",
+        "direction": "lower",
+    },
+)
+
+TREND_STAT_ORDER = {
+    "PTS": 1,
+    "REB": 2,
+    "AST": 3,
+    "STL": 4,
+    "BLK": 5,
+    "TOV": 6,
+    "MIN": 7,
+    "FANTASY_POINTS_SIMPLE": 8,
+}
+
+AGENT_METRIC_LEADER_CONFIG: dict[str, dict[str, str]] = {
+    "pts": {
+        "label": "PTS",
+        "column": "avg_pts",
+        "percentile_column": "pts_percentile",
+        "order": "DESC",
+    },
+    "reb": {
+        "label": "REB",
+        "column": "avg_reb",
+        "percentile_column": "reb_percentile",
+        "order": "DESC",
+    },
+    "ast": {
+        "label": "AST",
+        "column": "avg_ast",
+        "percentile_column": "ast_percentile",
+        "order": "DESC",
+    },
+    "stl": {
+        "label": "STL",
+        "column": "avg_stl",
+        "percentile_column": "stl_percentile",
+        "order": "DESC",
+    },
+    "blk": {
+        "label": "BLK",
+        "column": "avg_blk",
+        "percentile_column": "blk_percentile",
+        "order": "DESC",
+    },
+    "tov": {
+        "label": "TOV",
+        "column": "avg_tov",
+        "percentile_column": "tov_percentile",
+        "order": "ASC",
+    },
+    "fg3m": {
+        "label": "3PM",
+        "column": "avg_fg3m",
+        "percentile_column": "NULL",
+        "order": "DESC",
+    },
+    "min": {
+        "label": "MIN",
+        "column": "avg_min",
+        "percentile_column": "NULL",
+        "order": "DESC",
+    },
+    "fantasy_points_simple": {
+        "label": "BSI",
+        "column": "avg_fantasy_points_simple",
+        "percentile_column": "NULL",
+        "order": "DESC",
+    },
+}
+
+AGENT_METRIC_COLUMN_MAP: dict[str, str] = {
+    "pts": "avg_pts",
+    "reb": "avg_reb",
+    "ast": "avg_ast",
+    "stl": "avg_stl",
+    "blk": "avg_blk",
+    "fg3m": "avg_fg3m",
+    "tov": "avg_tov",
+    "min": "avg_min",
+    "fantasy_points_simple": "avg_fantasy_points_simple",
+}
+
+
+def _get_agent_metric_leader_config(metric: str) -> dict[str, str] | None:
+    metric_def = load_semantic_catalog().metrics.get(metric)
+    if metric_def is None:
+        return AGENT_METRIC_LEADER_CONFIG.get(metric)
+    if metric_def.formula:
+        try:
+            column = compile_formula_sql(metric_def.formula, AGENT_METRIC_COLUMN_MAP)
+        except FormulaError:
+            return None
+    else:
+        column = metric_def.leaderboard_column
+    if not column:
+        return None
+    order = "ASC" if metric_def.direction == "lower" else "DESC"
+    return {
+        "label": metric_def.label,
+        "column": column,
+        "percentile_column": metric_def.percentile_key or "NULL",
+        "order": order,
+    }
+
 
 def _to_iso(value: Any) -> str | None:
     if value is None:
@@ -158,7 +313,24 @@ def _to_float(value: Any) -> float | None:
 def _to_int(value: Any) -> int | None:
     if value in (None, ""):
         return None
-    return int(value)
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return int(float(value))
+
+
+def _to_bool(value: Any) -> bool | None:
+    if value in (None, ""):
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in ("true", "t", "1", "yes"):
+            return True
+        if normalized in ("false", "f", "0", "no"):
+            return False
+    return bool(value)
 
 
 def _parse_iso_datetime(value: Any) -> datetime | None:
@@ -478,6 +650,141 @@ def _format_category_profile(row: dict[str, Any]) -> list[dict[str, Any]]:
     return categories
 
 
+def _clamp_percentile(value: float | None) -> float | None:
+    if value is None:
+        return None
+    return min(100.0, max(0.0, value))
+
+
+def _build_sample_payload(
+    source: dict[str, Any], fallback: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    fallback = fallback or {}
+    games_sampled = _to_int(source.get("games_sampled"))
+    if games_sampled is None:
+        games_sampled = _to_int(fallback.get("games_sampled"))
+    qualification_games = _to_int(source.get("qualification_games"))
+    if qualification_games is None:
+        qualification_games = _to_int(fallback.get("qualification_games")) or 5
+    is_qualified = _to_bool(source.get("is_qualified"))
+    if is_qualified is None:
+        is_qualified = _to_bool(fallback.get("is_qualified"))
+    if is_qualified is None and games_sampled is not None:
+        is_qualified = games_sampled >= qualification_games
+    sample_status = source.get("sample_status") or fallback.get("sample_status")
+    if sample_status is None:
+        if games_sampled is None:
+            sample_status = STATE_UNAVAILABLE
+        elif games_sampled >= 10:
+            sample_status = "ready"
+        elif games_sampled >= qualification_games:
+            sample_status = "limited_sample"
+        else:
+            sample_status = STATE_INSUFFICIENT_SAMPLE
+    return {
+        "games_sampled": games_sampled,
+        "qualification_games": qualification_games,
+        "is_qualified": bool(is_qualified),
+        "sample_status": sample_status,
+        "sample_warning": source.get("sample_warning")
+        or fallback.get("sample_warning"),
+    }
+
+
+def _format_stat_percentiles(row: dict[str, Any]) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    for config in STAT_PERCENTILE_CONFIG:
+        percentile = _clamp_percentile(_to_float(row.get(config["percentile_field"])))
+        average = _to_float(row.get(config["average_field"]))
+        if percentile is None or average is None:
+            continue
+        items.append(
+            {
+                "key": config["key"],
+                "label": config["label"],
+                "average": round(average, 1),
+                "percentile": round(percentile, 1),
+                "bar_width": round(percentile, 1),
+                "direction": config["direction"],
+            }
+        )
+    return items
+
+
+def _format_chart_baselines(
+    row: dict[str, Any], fallback: dict[str, Any] | None = None
+) -> dict[str, dict[str, Any]]:
+    fallback = fallback or {}
+    baselines: dict[str, dict[str, Any]] = {}
+    for config in STAT_PERCENTILE_CONFIG:
+        value = _to_float(row.get(config["baseline_field"]))
+        if value is None:
+            value = _to_float(fallback.get(config["baseline_field"]))
+        if value is None:
+            continue
+        baselines[config["key"]] = {
+            "key": config["key"],
+            "label": config["label"],
+            "value": round(value, 1),
+            "direction": config["direction"],
+        }
+    return baselines
+
+
+def _has_chart_baselines(row: dict[str, Any] | None) -> bool:
+    if not row:
+        return False
+    return any(row.get(config["baseline_field"]) is not None for config in STAT_PERCENTILE_CONFIG)
+
+
+def _format_game_log_row(row: dict[str, Any], game_number: int) -> dict[str, Any]:
+    item = dict(row)
+    item["game_number"] = game_number
+    for key in (
+        "pts",
+        "reb",
+        "ast",
+        "stl",
+        "blk",
+        "tov",
+        "fg3m",
+        "fgm",
+        "fga",
+        "ftm",
+        "fta",
+    ):
+        parsed = _to_int(item.get(key))
+        if parsed is not None:
+            item[key] = parsed
+    for key in ("min", "fg_pct", "ft_pct", "fantasy_points_simple"):
+        parsed_float = _to_float(item.get(key))
+        if parsed_float is not None:
+            item[key] = round(parsed_float, 3 if key.endswith("_pct") else 1)
+    return item
+
+
+def _format_trend_row(row: dict[str, Any]) -> dict[str, Any]:
+    stat = str(row.get("stat") or "")
+    delta = _to_float(row.get("delta"))
+    if delta is None:
+        direction_is_good = None
+    elif stat == "TOV":
+        direction_is_good = delta < 0
+    else:
+        direction_is_good = delta > 0
+    return {
+        "stat": stat,
+        "label": "Box Score Index" if stat == "FANTASY_POINTS_SIMPLE" else stat,
+        "recent_games": _to_int(row.get("recent_games")),
+        "prior_games": _to_int(row.get("prior_games")),
+        "recent_avg": _to_float(row.get("recent_avg")),
+        "prior_avg": _to_float(row.get("prior_avg")),
+        "delta": delta,
+        "pct_change": _to_float(row.get("pct_change")),
+        "direction_is_good": direction_is_good,
+    }
+
+
 def _window_state(games_in_window: int | None, expected_games: int | None) -> str:
     if games_in_window is None:
         return STATE_UNAVAILABLE
@@ -565,7 +872,20 @@ class WarehouseRepository(Protocol):
         ...
 
     def get_player_game_log(
-        self, player_id: int, limit: int = 30
+        self,
+        player_id: int,
+        limit: int = 30,
+        *,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any] | None:
+        ...
+
+    def get_metric_leaders(self, metric: str, limit: int = 10) -> list[dict[str, Any]]:
+        ...
+
+    def get_player_metric_percentile(
+        self, player_id: int, metric: str, min_games: int = 5
     ) -> dict[str, Any] | None:
         ...
 
@@ -603,6 +923,12 @@ class BigQueryWarehouseRepository:
     def _detail_table(self) -> str:
         return f"`{self.settings.project_id}.{self.settings.gold_dataset}.workbench_player_detail`"
 
+    def _agent_player_search_table(self) -> str:
+        return f"`{self.settings.project_id}.{self.settings.agent_dataset}.agent_player_search`"
+
+    def _player_search_index_table(self) -> str:
+        return f"`{self.settings.project_id}.{self.settings.gold_dataset}.player_search_index`"
+
     def _compare_table(self) -> str:
         return f"`{self.settings.project_id}.{self.settings.gold_dataset}.workbench_compare`"
 
@@ -618,6 +944,12 @@ class BigQueryWarehouseRepository:
     def _fct_game_stats_table(self) -> str:
         return f"`{self.settings.project_id}.{self.settings.gold_dataset}.fct_player_game_stats`"
 
+    def _player_trends_table(self) -> str:
+        return f"`{self.settings.project_id}.{self.settings.gold_dataset}.player_trends`"
+
+    def _category_profile_table(self) -> str:
+        return f"`{self.settings.project_id}.{self.settings.gold_dataset}.player_category_profile`"
+
     def _decorate_dashboard_row(self, row: dict[str, Any]) -> dict[str, Any]:
         item = dict(row)
         item["category_strengths"] = _sanitize_category_list(
@@ -630,6 +962,18 @@ class BigQueryWarehouseRepository:
         item["player_initials"] = build_player_initials(row.get("player_name"))
         item["top_improvements"] = _build_top_improvement_chips(row)
         item["trend_direction"] = _trend_direction(row.get("trend_status"))
+        return item
+
+    def _decorate_search_player_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        item = dict(row)
+        item["player_id"] = _to_int(row.get("player_id"))
+        item["games_sampled"] = _to_int(row.get("games_sampled"))
+        item["qualification_games"] = _to_int(row.get("qualification_games")) or 5
+        item["is_qualified"] = bool(_to_bool(row.get("is_qualified")))
+        item["overall_rank"] = _to_int(row.get("overall_rank"))
+        item["recommendation_score"] = _to_float(row.get("recommendation_score"))
+        item["headshot_url"] = build_headshot_url(row.get("player_id"))
+        item["player_initials"] = build_player_initials(row.get("player_name"))
         return item
 
     def _fetch_dashboard_rows(
@@ -788,26 +1132,105 @@ class BigQueryWarehouseRepository:
         """
         return [self._decorate_dashboard_row(row) for row in self._query(sql, params)]
 
-    def _fetch_player_identity(self, player_id: int) -> dict[str, Any] | None:
+    def _fetch_player_identity_from_search_table(
+        self, table: str, player_id: int
+    ) -> list[dict[str, Any]]:
         sql = f"""
         SELECT
           player_id,
           player_name,
           latest_season,
+          latest_team_abbr,
+          latest_game_date,
+          games_sampled,
+          qualification_games,
+          is_qualified,
+          sample_status,
+          sample_warning,
+          overall_rank,
+          recommendation_score,
           last_seen_at_utc
-        FROM {self._dim_player_table()}
+        FROM {table}
         WHERE latest_season = @season
           AND player_id = @player_id
         LIMIT 1
         """
-        rows = self._query(
-            sql,
-            [
-                bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
-                bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
-            ],
-        )
+        params = [
+            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
+        ]
+        return self._query(sql, params)
+
+    def _fetch_player_identity(self, player_id: int) -> dict[str, Any] | None:
+        try:
+            rows = self._fetch_player_identity_from_search_table(
+                self._agent_player_search_table(), player_id
+            )
+        except BQAPIError:
+            try:
+                rows = self._fetch_player_identity_from_search_table(
+                    self._player_search_index_table(), player_id
+                )
+            except BQAPIError:
+                rows = self._fetch_player_identity_from_game_stats(player_id)
         return rows[0] if rows else None
+
+    def _fetch_player_identity_from_game_stats(
+        self, player_id: int
+    ) -> list[dict[str, Any]]:
+        sql = f"""
+        WITH qualified AS (
+          SELECT
+            season,
+            player_id,
+            ANY_VALUE(player_name) AS player_name,
+            ARRAY_AGG(
+              team_abbr IGNORE NULLS
+              ORDER BY game_date DESC, ingested_at_utc DESC
+              LIMIT 1
+            )[SAFE_OFFSET(0)] AS latest_team_abbr,
+            MAX(game_date) AS latest_game_date,
+            COUNT(*) AS games_sampled,
+            MAX(ingested_at_utc) AS last_seen_at_utc
+          FROM {self._fct_game_stats_table()}
+          WHERE season = @season
+            AND player_id = @player_id
+          GROUP BY season, player_id
+          HAVING COUNT(*) >= 5
+        )
+        SELECT
+          player_id,
+          player_name,
+          season AS latest_season,
+          latest_team_abbr,
+          latest_game_date,
+          games_sampled,
+          5 AS qualification_games,
+          TRUE AS is_qualified,
+          CASE
+            WHEN games_sampled >= 10 THEN 'ready'
+            ELSE 'limited_sample'
+          END AS sample_status,
+          CASE
+            WHEN games_sampled >= 10 THEN NULL
+            ELSE 'Limited sample: percentiles are available after the dbt model is rebuilt.'
+          END AS sample_warning,
+          NULL AS overall_rank,
+          NULL AS recommendation_score,
+          last_seen_at_utc
+        FROM qualified
+        LIMIT 1
+        """
+        try:
+            return self._query(
+                sql,
+                [
+                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
+                ],
+            )
+        except BQAPIError:
+            return []
 
     def _similarity_distance_sql(self, anchor_alias: str, candidate_alias: str) -> str:
         terms = [
@@ -1027,6 +1450,351 @@ class BigQueryWarehouseRepository:
             "contrasting_traits": _contrasting_similarity_traits(player_a, player_b),
         }
 
+    def _fetch_player_game_log_payload(
+        self,
+        identity: dict[str, Any],
+        limit: int = 30,
+        *,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict[str, Any]:
+        player_id = _to_int(identity.get("player_id"))
+        filters = ["season = @season", "player_id = @player_id"]
+        params: list[bigquery.ScalarQueryParameter] = [
+            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
+            bigquery.ScalarQueryParameter("limit", "INT64", limit),
+        ]
+        parsed_start_date = _parse_iso_date(start_date)
+        parsed_end_date = _parse_iso_date(end_date)
+        if parsed_start_date is not None:
+            filters.append("game_date >= @start_date")
+            params.append(
+                bigquery.ScalarQueryParameter("start_date", "DATE", parsed_start_date)
+            )
+        if parsed_end_date is not None:
+            filters.append("game_date <= @end_date")
+            params.append(
+                bigquery.ScalarQueryParameter("end_date", "DATE", parsed_end_date)
+            )
+        sql = f"""
+        SELECT
+          game_id,
+          season,
+          game_date,
+          player_id,
+          player_name,
+          team_abbr,
+          opponent_abbr,
+          home_away,
+          matchup,
+          wl,
+          min,
+          pts,
+          reb,
+          ast,
+          stl,
+          blk,
+          tov,
+          fg3m,
+          fgm,
+          fga,
+          fg_pct,
+          ftm,
+          fta,
+          ft_pct,
+          fantasy_points_simple
+        FROM {self._fct_game_stats_table()}
+        WHERE {" AND ".join(filters)}
+        ORDER BY game_date DESC, game_id DESC
+        LIMIT @limit
+        """
+        try:
+            rows = self._query(sql, params)
+        except BQAPIError:
+            rows = []
+        rows.reverse()
+        games = [
+            _format_game_log_row(row, game_number=index + 1)
+            for index, row in enumerate(rows)
+        ]
+        return {
+            "player_id": player_id,
+            "player_name": identity.get("player_name"),
+            "season": SUPPORTED_SEASON,
+            "games": games,
+            "games_returned": len(games),
+            "limit": limit,
+            "order": "chronological",
+            "date_range": {
+                "start_date": parsed_start_date.isoformat()
+                if parsed_start_date is not None
+                else None,
+                "end_date": parsed_end_date.isoformat()
+                if parsed_end_date is not None
+                else None,
+            },
+        }
+
+    def _fetch_player_trends(self, player_id: int) -> list[dict[str, Any]]:
+        sql = f"""
+        SELECT
+          stat,
+          recent_games,
+          prior_games,
+          recent_avg,
+          prior_avg,
+          delta,
+          pct_change
+        FROM {self._player_trends_table()}
+        WHERE season = @season
+          AND player_id = @player_id
+          AND stat IN ('PTS', 'REB', 'AST', 'STL', 'BLK', 'TOV', 'MIN', 'FANTASY_POINTS_SIMPLE')
+        """
+        try:
+            rows = self._query(
+                sql,
+                [
+                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
+                ],
+            )
+        except BQAPIError:
+            return []
+        rows.sort(key=lambda item: TREND_STAT_ORDER.get(str(item.get("stat")), 99))
+        return [_format_trend_row(row) for row in rows]
+
+    def _fetch_chart_baseline_row(self) -> dict[str, Any]:
+        sql = f"""
+        WITH player_means AS (
+          SELECT
+            season,
+            player_id,
+            AVG(pts) AS avg_pts,
+            AVG(reb) AS avg_reb,
+            AVG(ast) AS avg_ast,
+            AVG(stl) AS avg_stl,
+            AVG(blk) AS avg_blk,
+            AVG(tov) AS avg_tov,
+            COUNT(*) AS games_sampled
+          FROM {self._fct_game_stats_table()}
+          WHERE season = @season
+          GROUP BY season, player_id
+          HAVING COUNT(*) >= 5
+        )
+        SELECT
+          ROUND(AVG(avg_pts), 2) AS league_avg_pts,
+          ROUND(AVG(avg_reb), 2) AS league_avg_reb,
+          ROUND(AVG(avg_ast), 2) AS league_avg_ast,
+          ROUND(AVG(avg_stl), 2) AS league_avg_stl,
+          ROUND(AVG(avg_blk), 2) AS league_avg_blk,
+          ROUND(AVG(avg_tov), 2) AS league_avg_tov
+        FROM player_means
+        WHERE season = @season
+        """
+        try:
+            rows = self._query(
+                sql,
+                [
+                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)
+                ],
+            )
+        except BQAPIError:
+            return {}
+        return rows[0] if rows else {}
+
+    def _fetch_player_detail_row(
+        self, player_id: int
+    ) -> dict[str, Any] | None:
+        params = [
+            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
+        ]
+        sql = f"""
+        SELECT
+          season,
+          as_of_date,
+          player_id,
+          player_name,
+          latest_team_abbr,
+          latest_game_date,
+          overall_rank,
+          recommendation_score,
+          recommendation_tier,
+          category_strengths,
+          category_risks,
+          trend_delta,
+          trend_pct_change,
+          trend_status,
+          next_game_date,
+          next_opponent_abbr,
+          games_next_7d,
+          back_to_backs_next_7d,
+          opportunity_score,
+          reason_primary_code,
+          reason_primary_value,
+          reason_secondary_code,
+          reason_secondary_value,
+          reason_context_code,
+          reason_context_value,
+          games_sampled,
+          qualification_games,
+          is_qualified,
+          sample_status,
+          sample_warning,
+          z_pts,
+          z_reb,
+          z_ast,
+          z_stl,
+          z_blk,
+          z_fg3m,
+          z_tov,
+          pts_percentile,
+          reb_percentile,
+          ast_percentile,
+          stl_percentile,
+          blk_percentile,
+          tov_percentile,
+          season_avg_pts,
+          season_avg_reb,
+          season_avg_ast,
+          season_avg_stl,
+          season_avg_blk,
+          season_avg_tov,
+          league_avg_pts,
+          league_avg_reb,
+          league_avg_ast,
+          league_avg_stl,
+          league_avg_blk,
+          league_avg_tov,
+          category_score_7cat,
+          category_coverage_status,
+          last_5_games,
+          last_5_avg_min,
+          last_5_avg_pts,
+          last_5_avg_reb,
+          last_5_avg_ast,
+          last_5_avg_stl,
+          last_5_avg_blk,
+          last_5_avg_fg3m,
+          last_5_avg_tov,
+          last_5_fantasy_proxy,
+          prior_5_games,
+          prior_5_avg_min,
+          prior_5_avg_pts,
+          prior_5_avg_reb,
+          prior_5_avg_ast,
+          prior_5_avg_stl,
+          prior_5_avg_blk,
+          prior_5_avg_fg3m,
+          prior_5_avg_tov,
+          prior_5_fantasy_proxy,
+          last_10_games,
+          last_10_avg_min,
+          last_10_avg_pts,
+          last_10_avg_reb,
+          last_10_avg_ast,
+          last_10_avg_stl,
+          last_10_avg_blk,
+          last_10_avg_fg3m,
+          last_10_avg_tov,
+          last_10_fantasy_proxy
+        FROM {self._detail_table()}
+        WHERE season = @season
+          AND player_id = @player_id
+        LIMIT 1
+        """
+        try:
+            rows = self._query(sql, params)
+        except BQAPIError:
+            rows = self._fetch_legacy_player_detail_row(player_id)
+        return rows[0] if rows else None
+
+    def _fetch_legacy_player_detail_row(
+        self, player_id: int
+    ) -> list[dict[str, Any]]:
+        sql = f"""
+        SELECT
+          season,
+          as_of_date,
+          player_id,
+          player_name,
+          latest_team_abbr,
+          latest_game_date,
+          overall_rank,
+          recommendation_score,
+          recommendation_tier,
+          category_strengths,
+          category_risks,
+          trend_delta,
+          trend_pct_change,
+          trend_status,
+          next_game_date,
+          next_opponent_abbr,
+          games_next_7d,
+          back_to_backs_next_7d,
+          opportunity_score,
+          reason_primary_code,
+          reason_primary_value,
+          reason_secondary_code,
+          reason_secondary_value,
+          reason_context_code,
+          reason_context_value,
+          z_pts,
+          z_reb,
+          z_ast,
+          z_stl,
+          z_blk,
+          z_fg3m,
+          z_tov,
+          category_score_7cat,
+          category_coverage_status,
+          last_5_games,
+          last_5_avg_min,
+          last_5_avg_pts,
+          last_5_avg_reb,
+          last_5_avg_ast,
+          last_5_avg_stl,
+          last_5_avg_blk,
+          last_5_avg_fg3m,
+          last_5_avg_tov,
+          last_5_fantasy_proxy,
+          prior_5_games,
+          prior_5_avg_min,
+          prior_5_avg_pts,
+          prior_5_avg_reb,
+          prior_5_avg_ast,
+          prior_5_avg_stl,
+          prior_5_avg_blk,
+          prior_5_avg_fg3m,
+          prior_5_avg_tov,
+          prior_5_fantasy_proxy,
+          last_10_games,
+          last_10_avg_min,
+          last_10_avg_pts,
+          last_10_avg_reb,
+          last_10_avg_ast,
+          last_10_avg_stl,
+          last_10_avg_blk,
+          last_10_avg_fg3m,
+          last_10_avg_tov,
+          last_10_fantasy_proxy
+        FROM {self._detail_table()}
+        WHERE season = @season
+          AND player_id = @player_id
+        LIMIT 1
+        """
+        try:
+            return self._query(
+                sql,
+                [
+                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
+                ],
+            )
+        except BQAPIError:
+            return []
+
     def _build_player_detail_payload(
         self,
         *,
@@ -1036,6 +1804,9 @@ class BigQueryWarehouseRepository:
         similarity_state: str,
         similarity_reason: str | None,
         similar_players: list[dict[str, Any]],
+        game_log: dict[str, Any],
+        trends: list[dict[str, Any]],
+        chart_baselines: dict[str, dict[str, Any]],
     ) -> dict[str, Any]:
         archetype_state = STATE_UNAVAILABLE
         archetype_payload = {
@@ -1061,7 +1832,13 @@ class BigQueryWarehouseRepository:
                 "summary": archetype_row.get("archetype_summary"),
             }
 
+        game_log_state = (
+            STATE_FRESH if game_log.get("games") else STATE_UNAVAILABLE
+        )
+        trends_state = STATE_FRESH if trends else STATE_UNAVAILABLE
+
         if row is None:
+            sample = _build_sample_payload(identity)
             return {
                 "player": {
                     "season": identity.get("latest_season", SUPPORTED_SEASON),
@@ -1071,15 +1848,21 @@ class BigQueryWarehouseRepository:
                     "player_initials": build_player_initials(
                         identity.get("player_name")
                     ),
-                    "team_abbr": None,
-                    "latest_game_date": None,
-                    "overall_rank": None,
-                    "recommendation_score": None,
+                    "team_abbr": identity.get("latest_team_abbr"),
+                    "latest_game_date": identity.get("latest_game_date"),
+                    "overall_rank": _to_int(identity.get("overall_rank")),
+                    "recommendation_score": _to_float(
+                        identity.get("recommendation_score")
+                    ),
                     "recommendation_tier": None,
                     "category_strengths": None,
                     "category_risks": None,
                     "is_ranked": False,
+                    "games_sampled": sample["games_sampled"],
+                    "sample_status": sample["sample_status"],
+                    "is_qualified": sample["is_qualified"],
                 },
+                "sample": sample,
                 "availability_state": STATE_UNAVAILABLE,
                 "availability_reason": "Not currently ranked",
                 "reason_summary": None,
@@ -1091,12 +1874,19 @@ class BigQueryWarehouseRepository:
                 "panel_states": {
                     "recent_form": STATE_UNAVAILABLE,
                     "category_profile": STATE_UNAVAILABLE,
+                    "stat_percentiles": STATE_UNAVAILABLE,
+                    "game_log": game_log_state,
+                    "trends": trends_state,
                     "opportunity": STATE_UNAVAILABLE,
                     "archetype": archetype_state,
                     "similarity": similarity_state,
                 },
                 "recent_form": _default_recent_form(),
                 "category_profile": [],
+                "stat_percentiles": [],
+                "chart_baselines": chart_baselines,
+                "game_log": game_log,
+                "trends": trends,
                 "opportunity": None,
                 "archetype": archetype_payload,
                 "similarity_reason": similarity_reason,
@@ -1132,6 +1922,8 @@ class BigQueryWarehouseRepository:
             )
 
         category_profile = _format_category_profile(row)
+        stat_percentiles = _format_stat_percentiles(row)
+        sample = _build_sample_payload(row, identity)
         opportunity_state = _opportunity_state_from_row(row)
         recent_form_state = (
             STATE_FRESH
@@ -1141,6 +1933,9 @@ class BigQueryWarehouseRepository:
             else STATE_UNAVAILABLE
         )
         category_profile_state = STATE_FRESH if category_profile else STATE_UNAVAILABLE
+        stat_percentiles_state = (
+            STATE_FRESH if stat_percentiles else STATE_UNAVAILABLE
+        )
         opportunity = None
         if opportunity_state != STATE_UNAVAILABLE:
             opportunity = {
@@ -1168,7 +1963,11 @@ class BigQueryWarehouseRepository:
                 ),
                 "category_risks": _sanitize_category_list(row.get("category_risks")),
                 "is_ranked": row.get("overall_rank") is not None,
+                "games_sampled": sample["games_sampled"],
+                "sample_status": sample["sample_status"],
+                "is_qualified": sample["is_qualified"],
             },
+            "sample": sample,
             "availability_state": (
                 STATE_FRESH
                 if row.get("overall_rank") is not None
@@ -1186,12 +1985,19 @@ class BigQueryWarehouseRepository:
             "panel_states": {
                 "recent_form": recent_form_state,
                 "category_profile": category_profile_state,
+                "stat_percentiles": stat_percentiles_state,
+                "game_log": game_log_state,
+                "trends": trends_state,
                 "opportunity": opportunity_state,
                 "archetype": archetype_state,
                 "similarity": similarity_state,
             },
             "recent_form": recent_form,
             "category_profile": category_profile,
+            "stat_percentiles": stat_percentiles,
+            "chart_baselines": chart_baselines,
+            "game_log": game_log,
+            "trends": trends,
             "opportunity": opportunity,
             "archetype": archetype_payload,
             "similarity_reason": similarity_reason,
@@ -1318,113 +2124,135 @@ class BigQueryWarehouseRepository:
             order_by="overall_rank ASC, recommendation_score DESC, player_name",
         )
 
-    def search_players(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
-        table = self._dim_player_table()
+    def _search_players_from_search_table(
+        self, table: str, query: str, limit: int = 10
+    ) -> list[dict[str, Any]]:
         sql = f"""
         SELECT
           player_id,
           player_name,
           latest_season,
+          latest_team_abbr,
+          latest_game_date,
+          games_sampled,
+          qualification_games,
+          is_qualified,
+          sample_status,
+          sample_warning,
+          overall_rank,
+          recommendation_score,
           last_seen_at_utc
         FROM {table}
         WHERE latest_season = @season
-          AND LOWER(player_name) LIKE CONCAT('%', LOWER(@query), '%')
-        ORDER BY player_name
+          AND search_text LIKE CONCAT('%', LOWER(@query), '%')
+        ORDER BY
+          CASE
+            WHEN LOWER(player_name) = LOWER(@query) THEN 0
+            WHEN STARTS_WITH(LOWER(player_name), LOWER(@query)) THEN 1
+            ELSE 2
+          END,
+          overall_rank IS NULL,
+          overall_rank,
+          player_name
         LIMIT @limit
         """
-        return self._query(
-            sql,
-            [
-                bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
-                bigquery.ScalarQueryParameter("query", "STRING", query.strip()),
-                bigquery.ScalarQueryParameter("limit", "INT64", limit),
-            ],
+        params = [
+            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("query", "STRING", query.strip()),
+            bigquery.ScalarQueryParameter("limit", "INT64", limit),
+        ]
+        return self._query(sql, params)
+
+    def search_players(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        try:
+            rows = self._search_players_from_search_table(
+                self._agent_player_search_table(), query, limit
+            )
+        except BQAPIError:
+            try:
+                rows = self._search_players_from_search_table(
+                    self._player_search_index_table(), query, limit
+                )
+            except BQAPIError:
+                rows = self._search_players_from_game_stats(query, limit=limit)
+        return [self._decorate_search_player_row(row) for row in rows]
+
+    def _search_players_from_game_stats(
+        self, query: str, limit: int = 10
+    ) -> list[dict[str, Any]]:
+        sql = f"""
+        WITH qualified AS (
+          SELECT
+            season,
+            player_id,
+            ANY_VALUE(player_name) AS player_name,
+            ARRAY_AGG(
+              team_abbr IGNORE NULLS
+              ORDER BY game_date DESC, ingested_at_utc DESC
+              LIMIT 1
+            )[SAFE_OFFSET(0)] AS latest_team_abbr,
+            MAX(game_date) AS latest_game_date,
+            COUNT(*) AS games_sampled,
+            MAX(ingested_at_utc) AS last_seen_at_utc
+          FROM {self._fct_game_stats_table()}
+          WHERE season = @season
+          GROUP BY season, player_id
+          HAVING COUNT(*) >= 5
         )
+        SELECT
+          player_id,
+          player_name,
+          season AS latest_season,
+          latest_team_abbr,
+          latest_game_date,
+          games_sampled,
+          5 AS qualification_games,
+          TRUE AS is_qualified,
+          CASE
+            WHEN games_sampled >= 10 THEN 'ready'
+            ELSE 'limited_sample'
+          END AS sample_status,
+          CASE
+            WHEN games_sampled >= 10 THEN NULL
+            ELSE 'Limited sample: percentiles are available after the dbt model is rebuilt.'
+          END AS sample_warning,
+          NULL AS overall_rank,
+          NULL AS recommendation_score,
+          last_seen_at_utc
+        FROM qualified
+        WHERE LOWER(player_name) LIKE CONCAT('%', LOWER(@query), '%')
+        ORDER BY
+          CASE
+            WHEN LOWER(player_name) = LOWER(@query) THEN 0
+            WHEN STARTS_WITH(LOWER(player_name), LOWER(@query)) THEN 1
+            ELSE 2
+          END,
+          games_sampled DESC,
+          player_name
+        LIMIT @limit
+        """
+        try:
+            return self._query(
+                sql,
+                [
+                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter("query", "STRING", query.strip()),
+                    bigquery.ScalarQueryParameter("limit", "INT64", limit),
+                ],
+            )
+        except BQAPIError:
+            return []
 
     def get_player_detail(self, player_id: int) -> dict[str, Any] | None:
         identity = self._fetch_player_identity(player_id)
         if identity is None:
             return None
 
-        sql = f"""
-        SELECT
-          season,
-          as_of_date,
-          player_id,
-          player_name,
-          latest_team_abbr,
-          latest_game_date,
-          overall_rank,
-          recommendation_score,
-          recommendation_tier,
-          category_strengths,
-          category_risks,
-          trend_delta,
-          trend_pct_change,
-          trend_status,
-          next_game_date,
-          next_opponent_abbr,
-          games_next_7d,
-          back_to_backs_next_7d,
-          opportunity_score,
-          reason_primary_code,
-          reason_primary_value,
-          reason_secondary_code,
-          reason_secondary_value,
-          reason_context_code,
-          reason_context_value,
-          z_pts,
-          z_reb,
-          z_ast,
-          z_stl,
-          z_blk,
-          z_fg3m,
-          z_tov,
-          category_score_7cat,
-          category_coverage_status,
-          last_5_games,
-          last_5_avg_min,
-          last_5_avg_pts,
-          last_5_avg_reb,
-          last_5_avg_ast,
-          last_5_avg_stl,
-          last_5_avg_blk,
-          last_5_avg_fg3m,
-          last_5_avg_tov,
-          last_5_fantasy_proxy,
-          prior_5_games,
-          prior_5_avg_min,
-          prior_5_avg_pts,
-          prior_5_avg_reb,
-          prior_5_avg_ast,
-          prior_5_avg_stl,
-          prior_5_avg_blk,
-          prior_5_avg_fg3m,
-          prior_5_avg_tov,
-          prior_5_fantasy_proxy,
-          last_10_games,
-          last_10_avg_min,
-          last_10_avg_pts,
-          last_10_avg_reb,
-          last_10_avg_ast,
-          last_10_avg_stl,
-          last_10_avg_blk,
-          last_10_avg_fg3m,
-          last_10_avg_tov,
-          last_10_fantasy_proxy
-        FROM {self._detail_table()}
-        WHERE season = @season
-          AND player_id = @player_id
-        LIMIT 1
-        """
-        rows = self._query(
-            sql,
-            [
-                bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
-                bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
-            ],
-        )
-        row = rows[0] if rows else None
+        row = self._fetch_player_detail_row(player_id)
+        game_log = self._fetch_player_game_log_payload(identity, limit=30)
+        trends = self._fetch_player_trends(player_id)
+        baseline_fallback = {} if _has_chart_baselines(row) else self._fetch_chart_baseline_row()
+        chart_baselines = _format_chart_baselines(row or {}, baseline_fallback)
         anchor = self._fetch_similarity_anchor(player_id)
         (
             similarity_state,
@@ -1441,6 +2269,9 @@ class BigQueryWarehouseRepository:
             similarity_state=similarity_state,
             similarity_reason=similarity_reason,
             similar_players=similar_players,
+            game_log=game_log,
+            trends=trends,
+            chart_baselines=chart_baselines,
         )
 
     def get_compare(
@@ -1648,37 +2479,230 @@ class BigQueryWarehouseRepository:
         return rows[0] if rows else None
 
     def get_player_game_log(
-        self, player_id: int, limit: int = 30
+        self,
+        player_id: int,
+        limit: int = 30,
+        *,
+        start_date: str | None = None,
+        end_date: str | None = None,
     ) -> dict[str, Any] | None:
         identity = self._fetch_player_identity(player_id)
         if identity is None:
             return None
+        return self._fetch_player_game_log_payload(
+            identity,
+            limit=limit,
+            start_date=start_date,
+            end_date=end_date,
+        )
 
+    def get_metric_leaders(self, metric: str, limit: int = 10) -> list[dict[str, Any]]:
+        config = _get_agent_metric_leader_config(metric)
+        if config is None:
+            raise ValueError(f"Unsupported metric for leaderboard: {metric}")
+        column = config["column"]
+        percentile_column = config["percentile_column"]
+        order = config["order"]
         sql = f"""
         SELECT
-          game_date, opponent_abbr, home_away, wl, min,
-          pts, reb, ast, stl, blk, tov, fg3m,
-          fgm, fga, fg_pct, ftm, fta, ft_pct,
-          fantasy_points_simple
-        FROM {self._fct_game_stats_table()}
-        WHERE season = @season AND player_id = @player_id
-        ORDER BY game_date DESC
+          season,
+          player_id,
+          player_name,
+          latest_team_abbr AS team_abbr,
+          games_sampled,
+          sample_status,
+          @metric_key AS metric_key,
+          @metric_label AS metric_label,
+          ROUND({column}, 2) AS metric_value,
+          {percentile_column} AS percentile
+        FROM {self._category_profile_table()}
+        WHERE season = @season
+          AND is_qualified
+        ORDER BY {column} {order}, games_sampled DESC, player_name
         LIMIT @limit
         """
-        rows = self._query(
-            sql,
-            [
-                bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
-                bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
-                bigquery.ScalarQueryParameter("limit", "INT64", limit),
-            ],
+        try:
+            rows = self._query(
+                sql,
+                [
+                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter("metric_key", "STRING", metric),
+                    bigquery.ScalarQueryParameter(
+                        "metric_label", "STRING", config["label"]
+                    ),
+                    bigquery.ScalarQueryParameter("limit", "INT64", limit),
+                ],
+            )
+        except BQAPIError:
+            legacy_sql = f"""
+            SELECT
+              season,
+              player_id,
+              player_name,
+              latest_team_abbr AS team_abbr,
+              games_sampled,
+              CASE
+                WHEN games_sampled >= 10 THEN 'ready'
+                WHEN games_sampled >= 5 THEN 'limited_sample'
+                ELSE 'insufficient_sample'
+              END AS sample_status,
+              @metric_key AS metric_key,
+              @metric_label AS metric_label,
+              ROUND({column}, 2) AS metric_value,
+              NULL AS percentile
+            FROM {self._category_profile_table()}
+            WHERE season = @season
+              AND games_sampled >= 5
+              AND {column} IS NOT NULL
+            ORDER BY {column} {order}, games_sampled DESC, player_name
+            LIMIT @limit
+            """
+            try:
+                rows = self._query(
+                    legacy_sql,
+                    [
+                        bigquery.ScalarQueryParameter(
+                            "season", "STRING", SUPPORTED_SEASON
+                        ),
+                        bigquery.ScalarQueryParameter("metric_key", "STRING", metric),
+                        bigquery.ScalarQueryParameter(
+                            "metric_label", "STRING", config["label"]
+                        ),
+                        bigquery.ScalarQueryParameter("limit", "INT64", limit),
+                    ],
+                )
+            except BQAPIError:
+                return []
+        return [
+            {
+                "season": row.get("season"),
+                "player_id": _to_int(row.get("player_id")),
+                "player_name": row.get("player_name"),
+                "team_abbr": row.get("team_abbr"),
+                "games_sampled": _to_int(row.get("games_sampled")),
+                "sample_status": row.get("sample_status"),
+                "metric_key": row.get("metric_key"),
+                "metric_label": row.get("metric_label"),
+                "metric_value": _to_float(row.get("metric_value")),
+                "percentile": _to_float(row.get("percentile")),
+            }
+            for row in rows
+        ]
+
+    def get_player_metric_percentile(
+        self, player_id: int, metric: str, min_games: int = 5
+    ) -> dict[str, Any] | None:
+        config = _get_agent_metric_leader_config(metric)
+        if config is None:
+            raise ValueError(f"Unsupported metric for percentile: {metric}")
+        column = config["column"]
+        rank_order = "ASC" if config["order"] == "ASC" else "DESC"
+        percentile_order = "DESC" if config["order"] == "ASC" else "ASC"
+        min_games = max(1, min(200, int(min_games)))
+        sql = f"""
+        WITH player_rows AS (
+          SELECT
+            season,
+            player_id,
+            player_name,
+            latest_team_abbr AS team_abbr,
+            games_sampled,
+            ROUND({column}, 2) AS metric_value
+          FROM {self._category_profile_table()}
+          WHERE season = @season
+            AND {column} IS NOT NULL
+        ),
+        cohort AS (
+          SELECT *
+          FROM player_rows
+          WHERE games_sampled >= @min_games
+        ),
+        ranked AS (
+          SELECT
+            *,
+            RANK() OVER (ORDER BY metric_value {rank_order}, player_name) AS cohort_rank,
+            ROUND(
+              CASE
+                WHEN COUNT(*) OVER () <= 1 THEN 100
+                ELSE PERCENT_RANK() OVER (ORDER BY metric_value {percentile_order}) * 100
+              END,
+              1
+            ) AS percentile
+          FROM cohort
+        ),
+        all_summary AS (
+          SELECT
+            COUNT(*) AS player_count,
+            MAX(games_sampled) AS max_games_sampled
+          FROM player_rows
+        ),
+        cohort_summary AS (
+          SELECT
+            COUNT(*) AS cohort_size,
+            ROUND(AVG(metric_value), 2) AS cohort_avg
+          FROM cohort
         )
-        rows.reverse()
+        SELECT
+          @metric_key AS metric_key,
+          @metric_label AS metric_label,
+          @min_games AS min_games,
+          p.season,
+          p.player_id,
+          p.player_name,
+          p.team_abbr,
+          p.games_sampled,
+          p.metric_value,
+          r.cohort_rank,
+          r.percentile,
+          cs.cohort_size,
+          cs.cohort_avg,
+          s.player_count,
+          s.max_games_sampled
+        FROM all_summary s
+        CROSS JOIN cohort_summary cs
+        LEFT JOIN player_rows p
+          ON p.player_id = @player_id
+        LEFT JOIN ranked r
+          ON r.player_id = p.player_id
+        LIMIT 1
+        """
+        try:
+            rows = self._query(
+                sql,
+                [
+                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
+                    bigquery.ScalarQueryParameter("metric_key", "STRING", metric),
+                    bigquery.ScalarQueryParameter(
+                        "metric_label", "STRING", config["label"]
+                    ),
+                    bigquery.ScalarQueryParameter("min_games", "INT64", min_games),
+                ],
+            )
+        except BQAPIError:
+            return None
+        if not rows:
+            return None
+        row = rows[0]
+        if row.get("player_id") is None:
+            return None
         return {
-            "player_id": identity.get("player_id"),
-            "player_name": identity.get("player_name"),
-            "season": SUPPORTED_SEASON,
-            "games": rows,
+            "season": row.get("season"),
+            "player_id": _to_int(row.get("player_id")),
+            "player_name": row.get("player_name"),
+            "team_abbr": row.get("team_abbr"),
+            "games_sampled": _to_int(row.get("games_sampled")),
+            "metric_key": row.get("metric_key"),
+            "metric_label": row.get("metric_label"),
+            "metric_value": _to_float(row.get("metric_value")),
+            "min_games": _to_int(row.get("min_games")),
+            "cohort_rank": _to_int(row.get("cohort_rank")),
+            "percentile": _to_float(row.get("percentile")),
+            "cohort_size": _to_int(row.get("cohort_size")),
+            "cohort_avg": _to_float(row.get("cohort_avg")),
+            "player_count": _to_int(row.get("player_count")),
+            "max_games_sampled": _to_int(row.get("max_games_sampled")),
+            "in_requested_cohort": row.get("cohort_rank") is not None,
         }
 
     def get_health(self) -> dict[str, Any]:

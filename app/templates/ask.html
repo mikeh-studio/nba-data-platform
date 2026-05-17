@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="hero ask-hero">
+    <div class="hero-top">
+      <div>
+        <div class="eyebrow">Ask</div>
+        <h1>Ask NBA Stats</h1>
+      </div>
+      <div class="hero-actions">
+        {% if health.status == "stale" %}
+          <span class="status" title="{{ health.last_successful_finished_at_utc or '' }}">Last refresh {{ health.last_successful_finished_at_utc | time_ago }}</span>
+        {% elif health.status == "fresh" %}
+          <span class="status">Data fresh</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <form class="ask-form" data-agent-form>
+      <label class="sr-only" for="agent-question">Question</label>
+      <textarea
+        id="agent-question"
+        class="input ask-input"
+        name="question"
+        rows="3"
+        maxlength="500"
+        placeholder="How is Tyrese Maxey trending in points and assists?"
+        data-agent-question
+      ></textarea>
+      <div class="ask-actions">
+        <button class="button" type="submit" data-agent-submit>Ask</button>
+        <button class="button secondary" type="button" data-agent-example="Who is similar to Tyrese Maxey?">Similar players</button>
+        <button class="button secondary" type="button" data-agent-example="Show the top 10 players by assists percentile.">Top assists</button>
+        <button class="button secondary" type="button" data-agent-example="Compare LeBron's last 10 games against league baseline for points.">Trend check</button>
+      </div>
+    </form>
+
+    {% if not agent_enabled %}
+      <div class="notice" data-agent-config-state>
+        <strong>Ask NBA Stats is disabled.</strong>
+        <span class="meta">Set OPENAI_AGENT_ENABLED=true to enable it.</span>
+      </div>
+    {% elif not agent_configured %}
+      <div class="notice" data-agent-config-state>
+        <strong>Ask NBA Stats needs an OpenAI API key.</strong>
+        <span class="meta">Set OPENAI_API_KEY before using this page.</span>
+      </div>
+    {% endif %}
+  </section>
+
+  <div class="workspace ask-workspace">
+    <section class="main-stack">
+      <div class="card" data-agent-answer-card>
+        <div class="card-header">
+          <h2>Answer</h2>
+          <span class="meta" data-agent-status>Ready</span>
+        </div>
+        <div class="empty-state" data-agent-empty>
+          <p>Ask about player trends, percentiles, rankings, game logs, or similar players.</p>
+        </div>
+        <div class="agent-answer" data-agent-answer hidden></div>
+      </div>
+
+      <div class="card" data-agent-chart-card hidden>
+        <div class="card-header">
+          <h2>Charts</h2>
+        </div>
+        <div class="agent-chart-grid" data-agent-charts></div>
+      </div>
+
+      <div class="card" data-agent-table-card hidden>
+        <div class="card-header">
+          <h2>Tables</h2>
+        </div>
+        <div class="stack" data-agent-tables></div>
+      </div>
+    </section>
+
+    <aside class="rail-stack">
+      <div class="card">
+        <div class="card-header">
+          <h2>Context</h2>
+        </div>
+        <div class="stack-list" data-agent-context>
+          <div class="empty-state">
+            <p>Metric definitions and assumptions will appear after an answer.</p>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <style>
+    .ask-hero {
+      gap: 1.1rem;
+    }
+    .ask-form {
+      display: grid;
+      gap: 0.8rem;
+    }
+    .ask-input {
+      width: 100%;
+      min-height: 7rem;
+      resize: vertical;
+      border-radius: 18px;
+      line-height: 1.5;
+    }
+    .ask-actions {
+      display: flex;
+      gap: 0.55rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .agent-answer {
+      display: grid;
+      gap: 1rem;
+      line-height: 1.6;
+    }
+    .agent-answer-text {
+      white-space: pre-wrap;
+    }
+    .agent-chart-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 0.9rem;
+    }
+    .agent-chart {
+      min-height: 250px;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(30, 35, 41, 0.52);
+      overflow: hidden;
+    }
+    .agent-chart svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+    .agent-chart-title {
+      padding: 0.8rem 0.9rem 0;
+      color: var(--highlight);
+      font-weight: 600;
+    }
+    .agent-axis,
+    .agent-point-label {
+      fill: var(--muted);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+    }
+    .agent-line {
+      fill: none;
+      stroke: var(--accent-hot);
+      stroke-width: 3;
+    }
+    .agent-bar {
+      fill: var(--accent);
+    }
+    .agent-dot {
+      fill: var(--highlight);
+      stroke: var(--accent);
+      stroke-width: 2;
+    }
+    .agent-tooltip {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 120ms ease;
+    }
+    .agent-point:hover .agent-tooltip,
+    .agent-point:focus .agent-tooltip {
+      opacity: 1;
+    }
+    .agent-tooltip-box {
+      fill: rgba(15, 17, 19, 0.96);
+      stroke: rgba(231, 224, 212, 0.24);
+    }
+    .agent-tooltip-text {
+      fill: var(--ink);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.72rem;
+    }
+    @media (max-width: 980px) {
+      .ask-workspace {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+  <script type="module" src="/static/agent.js"></script>
+{% endblock %}

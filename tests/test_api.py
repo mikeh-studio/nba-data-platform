@@ -3,12 +3,14 @@ from __future__ import annotations
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.main import app, get_repository
+from app.config import Settings, get_settings
+from app.main import app, get_agent_client, get_repository
 from app.repository import WarehouseRepository
 from app.telemetry import LOGGER_NAME
 
@@ -180,6 +182,16 @@ class FakeRepository(WarehouseRepository):
                     "player_id": 9,
                     "player_name": "Mikal Bridges",
                     "latest_season": "2025-26",
+                    "latest_team_abbr": "NYK",
+                    "latest_game_date": "2026-02-10",
+                    "games_sampled": 6,
+                    "qualification_games": 5,
+                    "is_qualified": True,
+                    "sample_status": "limited_sample",
+                    "overall_rank": None,
+                    "recommendation_score": None,
+                    "headshot_url": "https://cdn.nba.com/headshots/nba/latest/1040x760/9.png",
+                    "player_initials": "MB",
                     "last_seen_at_utc": "2026-02-10T13:00:00+00:00",
                 }
             ][:limit]
@@ -188,6 +200,16 @@ class FakeRepository(WarehouseRepository):
                 "player_id": 7,
                 "player_name": "Tyrese Maxey",
                 "latest_season": "2025-26",
+                "latest_team_abbr": "PHI",
+                "latest_game_date": "2026-02-10",
+                "games_sampled": 12,
+                "qualification_games": 5,
+                "is_qualified": True,
+                "sample_status": "ready",
+                "overall_rank": 12,
+                "recommendation_score": 91.2,
+                "headshot_url": "https://cdn.nba.com/headshots/nba/latest/1040x760/7.png",
+                "player_initials": "TM",
                 "last_seen_at_utc": "2026-02-10T13:00:00+00:00",
             }
         ][:limit]
@@ -209,6 +231,16 @@ class FakeRepository(WarehouseRepository):
                     "category_strengths": "PTS, AST, 3PM",
                     "category_risks": "FG%",
                     "is_ranked": True,
+                    "games_sampled": 12,
+                    "sample_status": "ready",
+                    "is_qualified": True,
+                },
+                "sample": {
+                    "games_sampled": 12,
+                    "qualification_games": 5,
+                    "is_qualified": True,
+                    "sample_status": "ready",
+                    "sample_warning": None,
                 },
                 "availability_state": "fresh",
                 "availability_reason": None,
@@ -224,6 +256,9 @@ class FakeRepository(WarehouseRepository):
                     "opportunity": "fresh",
                     "archetype": "fresh",
                     "similarity": "fresh",
+                    "stat_percentiles": "fresh",
+                    "game_log": "fresh",
+                    "trends": "fresh",
                 },
                 "recent_form": [
                     {
@@ -286,6 +321,76 @@ class FakeRepository(WarehouseRepository):
                         "category_direction": "up",
                     }
                 ],
+                "stat_percentiles": [
+                    {
+                        "key": "pts",
+                        "label": "PTS",
+                        "average": 25.8,
+                        "percentile": 91.0,
+                        "bar_width": 91.0,
+                        "direction": "higher",
+                    },
+                    {
+                        "key": "tov",
+                        "label": "Ball Security",
+                        "average": 2.2,
+                        "percentile": 54.0,
+                        "bar_width": 54.0,
+                        "direction": "lower",
+                    },
+                ],
+                "chart_baselines": {
+                    "pts": {
+                        "key": "pts",
+                        "label": "PTS",
+                        "value": 12.4,
+                        "direction": "higher",
+                    },
+                    "reb": {
+                        "key": "reb",
+                        "label": "REB",
+                        "value": 4.5,
+                        "direction": "higher",
+                    },
+                    "ast": {
+                        "key": "ast",
+                        "label": "AST",
+                        "value": 2.8,
+                        "direction": "higher",
+                    },
+                    "stl": {
+                        "key": "stl",
+                        "label": "STL",
+                        "value": 0.8,
+                        "direction": "higher",
+                    },
+                    "blk": {
+                        "key": "blk",
+                        "label": "BLK",
+                        "value": 0.5,
+                        "direction": "higher",
+                    },
+                    "tov": {
+                        "key": "tov",
+                        "label": "Ball Security",
+                        "value": 1.3,
+                        "direction": "lower",
+                    },
+                },
+                "game_log": self.get_player_game_log(7),
+                "trends": [
+                    {
+                        "stat": "PTS",
+                        "label": "PTS",
+                        "recent_games": 5,
+                        "prior_games": 5,
+                        "recent_avg": 28.4,
+                        "prior_avg": 22.0,
+                        "delta": 6.4,
+                        "pct_change": 29.1,
+                        "direction_is_good": True,
+                    }
+                ],
                 "opportunity": {
                     "games_next_7d": 4,
                     "back_to_backs_next_7d": 1,
@@ -332,6 +437,16 @@ class FakeRepository(WarehouseRepository):
                     "category_strengths": None,
                     "category_risks": None,
                     "is_ranked": False,
+                    "games_sampled": 6,
+                    "sample_status": "limited_sample",
+                    "is_qualified": True,
+                },
+                "sample": {
+                    "games_sampled": 6,
+                    "qualification_games": 5,
+                    "is_qualified": True,
+                    "sample_status": "limited_sample",
+                    "sample_warning": "Limited sample: percentiles are available, but still volatile.",
                 },
                 "availability_state": "unavailable",
                 "availability_reason": "Not currently ranked",
@@ -347,9 +462,16 @@ class FakeRepository(WarehouseRepository):
                     "opportunity": "unavailable",
                     "archetype": "unavailable",
                     "similarity": "unavailable",
+                    "stat_percentiles": "unavailable",
+                    "game_log": "unavailable",
+                    "trends": "unavailable",
                 },
                 "recent_form": [],
                 "category_profile": [],
+                "stat_percentiles": [],
+                "chart_baselines": {},
+                "game_log": self.get_player_game_log(9),
+                "trends": [],
                 "opportunity": None,
                 "archetype": {
                     "state": "unavailable",
@@ -364,13 +486,26 @@ class FakeRepository(WarehouseRepository):
             }
         return None
 
-    def get_player_game_log(self, player_id: int, limit: int = 30) -> dict | None:
+    def get_player_game_log(
+        self,
+        player_id: int,
+        limit: int = 30,
+        *,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict | None:
         if player_id == 7:
             games = [
                 {
+                    "game_id": f"0022500{d}",
+                    "season": "2025-26",
                     "game_date": f"2026-02-{str(d).zfill(2)}",
+                    "player_id": 7,
+                    "player_name": "Tyrese Maxey",
+                    "team_abbr": "PHI",
                     "opponent_abbr": "NYK",
                     "home_away": "home",
+                    "matchup": "PHI vs. NYK",
                     "wl": "W",
                     "min": "36.0",
                     "pts": str(20 + d),
@@ -390,11 +525,19 @@ class FakeRepository(WarehouseRepository):
                 }
                 for d in range(1, min(limit, 5) + 1)
             ]
+            if start_date:
+                games = [game for game in games if game["game_date"] >= start_date]
+            if end_date:
+                games = [game for game in games if game["game_date"] <= end_date]
             return {
                 "player_id": 7,
                 "player_name": "Tyrese Maxey",
                 "season": "2025-26",
                 "games": games,
+                "games_returned": len(games),
+                "limit": limit,
+                "order": "chronological",
+                "date_range": {"start_date": start_date, "end_date": end_date},
             }
         if player_id == 9:
             return {
@@ -402,8 +545,53 @@ class FakeRepository(WarehouseRepository):
                 "player_name": "Mikal Bridges",
                 "season": "2025-26",
                 "games": [],
+                "games_returned": 0,
+                "limit": limit,
+                "order": "chronological",
+                "date_range": {"start_date": start_date, "end_date": end_date},
             }
         return None
+
+    def get_metric_leaders(self, metric: str, limit: int = 10) -> list[dict]:
+        rows = [
+            {
+                "season": "2025-26",
+                "player_id": 7,
+                "player_name": "Tyrese Maxey",
+                "team_abbr": "PHI",
+                "games_sampled": 12,
+                "sample_status": "ready",
+                "metric_key": metric,
+                "metric_label": metric.upper(),
+                "metric_value": 28.4,
+                "percentile": 91.0,
+            }
+        ]
+        return rows[:limit]
+
+    def get_player_metric_percentile(
+        self, player_id: int, metric: str, min_games: int = 5
+    ) -> dict | None:
+        if player_id != 7:
+            return None
+        return {
+            "season": "2025-26",
+            "player_id": 7,
+            "player_name": "Tyrese Maxey",
+            "team_abbr": "PHI",
+            "games_sampled": 12,
+            "metric_key": metric,
+            "metric_label": "Attributed Points",
+            "metric_value": 42.2,
+            "min_games": min_games,
+            "cohort_rank": 8,
+            "percentile": 94.0,
+            "cohort_size": 100,
+            "cohort_avg": 24.0,
+            "player_count": 500,
+            "max_games_sampled": 82,
+            "in_requested_cohort": True,
+        }
 
     def get_compare(
         self,
@@ -649,8 +837,126 @@ class MissingOpportunityRepository(FakeRepository):
         return detail
 
 
-def build_client(repo: WarehouseRepository | None = None) -> TestClient:
+def _test_settings(**overrides: object) -> Settings:
+    values = {
+        "project_id": "local-project",
+        "gold_dataset": "nba_gold",
+        "metadata_dataset": "nba_metadata",
+        "freshness_threshold_hours": 36,
+        "max_search_results": 12,
+        "openai_api_key": None,
+        "openai_agent_model": "gpt-5.4-mini",
+        "openai_agent_enabled": True,
+        "agent_max_tool_calls": 6,
+    }
+    values.update(overrides)
+    return Settings(**values)
+
+
+class FakeOpenAIResponses:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def create(self, **_kwargs):
+        self.calls += 1
+        if self.calls == 1:
+            return SimpleNamespace(
+                output=[
+                    SimpleNamespace(
+                        type="function_call",
+                        name="resolve_player",
+                        arguments=json.dumps({"name": "Tyrese Maxey", "limit": 5}),
+                        call_id="call_1",
+                    )
+                ],
+                output_text="",
+            )
+        return SimpleNamespace(
+            output=[],
+            output_text=json.dumps(
+                {
+                    "answer": "Tyrese Maxey resolves to a qualified 2025-26 player.",
+                    "assumptions": ["Qualified players have at least 5 games."],
+                    "tables": [],
+                    "charts": [],
+                    "metric_definitions": [
+                        {
+                            "key": "pts",
+                            "label": "PTS",
+                            "definition": "Points per game.",
+                        }
+                    ],
+                    "followups": ["Show Maxey's points trend."],
+                }
+            ),
+        )
+
+
+class FakeOpenAIClient:
+    def __init__(self) -> None:
+        self.responses = FakeOpenAIResponses()
+
+
+class FakeOpenAIDateRangeResponses:
+    def __init__(self) -> None:
+        self.calls = 0
+        self.first_tools: list[dict] = []
+
+    def create(self, **kwargs):
+        self.calls += 1
+        if self.calls == 1:
+            self.first_tools = kwargs["tools"]
+            return SimpleNamespace(
+                output=[
+                    SimpleNamespace(
+                        type="function_call",
+                        name="get_player_game_log",
+                        arguments=json.dumps(
+                            {
+                                "player_id": 7,
+                                "metrics": ["points"],
+                                "limit": 82,
+                                "start_date": "2026-02-02",
+                                "end_date": "2026-02-03",
+                            }
+                        ),
+                        call_id="call_1",
+                    )
+                ],
+                output_text="",
+            )
+        return SimpleNamespace(
+            output=[],
+            output_text=json.dumps(
+                {
+                    "answer": "Date range filtered game log returned.",
+                    "assumptions": [],
+                    "tables": [],
+                    "charts": [],
+                    "metric_definitions": [],
+                    "followups": [],
+                }
+            ),
+        )
+
+
+class FakeOpenAIDateRangeClient:
+    def __init__(self) -> None:
+        self.responses = FakeOpenAIDateRangeResponses()
+
+
+def build_client(
+    repo: WarehouseRepository | None = None,
+    *,
+    settings: Settings | None = None,
+    agent_client: object | None = None,
+) -> TestClient:
+    app.dependency_overrides.clear()
     app.dependency_overrides[get_repository] = lambda: repo or FakeRepository()
+    if settings is not None:
+        app.dependency_overrides[get_settings] = lambda: settings
+    if agent_client is not None:
+        app.dependency_overrides[get_agent_client] = lambda: agent_client
     return TestClient(app)
 
 
@@ -713,6 +1019,70 @@ def test_recommendations_page_removed() -> None:
     assert response.status_code == 404
 
 
+def test_ask_page_smoke() -> None:
+    client = build_client()
+    response = client.get("/ask")
+
+    assert response.status_code == 200
+    assert "Ask NBA Stats" in response.text
+    assert "/static/agent.js" in response.text
+
+
+def test_api_agent_ask_returns_disabled_without_openai_key() -> None:
+    client = build_client(settings=_test_settings(openai_api_key=None))
+    response = client.post(
+        "/api/agent/ask",
+        json={"question": "How is Tyrese Maxey trending?"},
+    )
+
+    assert response.status_code == 503
+    assert "OPENAI_API_KEY" in response.json()["detail"]
+
+
+def test_api_agent_ask_runs_mocked_openai_tool_loop() -> None:
+    fake_openai = FakeOpenAIClient()
+    client = build_client(
+        settings=_test_settings(openai_api_key="test-key"),
+        agent_client=fake_openai,
+    )
+    response = client.post(
+        "/api/agent/ask",
+        json={"question": "How is Tyrese Maxey trending?"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["season"] == "2025-26"
+    assert payload["answer"].startswith("Tyrese Maxey")
+    assert payload["tool_calls"][0] == {"name": "resolve_player", "status": "ok"}
+    assert fake_openai.responses.calls == 2
+
+
+def test_api_agent_ask_accepts_date_range_tool_args() -> None:
+    fake_openai = FakeOpenAIDateRangeClient()
+    client = build_client(
+        settings=_test_settings(openai_api_key="test-key"),
+        agent_client=fake_openai,
+    )
+    response = client.post(
+        "/api/agent/ask",
+        json={
+            "question": "Show Tyrese Maxey points from 2026-02-02 to 2026-02-03."
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["tool_calls"][0] == {"name": "get_player_game_log", "status": "ok"}
+    game_log_schema = next(
+        tool for tool in fake_openai.responses.first_tools
+        if tool["name"] == "get_player_game_log"
+    )
+    properties = game_log_schema["parameters"]["properties"]
+    assert properties["start_date"]["type"] == ["string", "null"]
+    assert properties["end_date"]["type"] == ["string", "null"]
+
+
 def test_player_page_smoke() -> None:
     client = build_client()
     response = client.get("/players/7")
@@ -722,7 +1092,12 @@ def test_player_page_smoke() -> None:
     assert "Archetype" in response.text
     assert "Similar Players" in response.text
     assert "Compare player" in response.text
+    assert "Find qualified player" in response.text
+    assert "Performance" in response.text
+    assert "Game Log" in response.text
     assert "Recent Windows" in response.text
+    assert "League Percentiles" in response.text
+    assert "Ball Security" in response.text
     assert "Box Score Index" in response.text
     assert "Primary Creator" in response.text
     assert "Jalen Brunson" in response.text
@@ -806,6 +1181,18 @@ def test_api_player_search_rejects_blank_query() -> None:
     assert response.json()["detail"] == "Search query must not be blank"
 
 
+def test_api_player_search_returns_qualified_player_metadata() -> None:
+    client = build_client()
+    response = client.get("/api/players/search?q=maxey")
+
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert item["player_name"] == "Tyrese Maxey"
+    assert item["is_qualified"] is True
+    assert item["games_sampled"] == 12
+    assert item["headshot_url"].endswith("/7.png")
+
+
 def test_api_player_detail_available_player() -> None:
     client = build_client()
     response = client.get("/api/players/7")
@@ -814,6 +1201,10 @@ def test_api_player_detail_available_player() -> None:
     payload = response.json()
     assert payload["item"]["availability_state"] == "fresh"
     assert payload["item"]["player"]["overall_rank"] == 12
+    assert payload["item"]["sample"]["games_sampled"] == 12
+    assert payload["item"]["stat_percentiles"][0]["label"] == "PTS"
+    assert payload["item"]["chart_baselines"]["pts"]["value"] == 12.4
+    assert payload["item"]["game_log"]["games_returned"] == 5
     assert payload["item"]["player"]["headshot_url"].endswith("/7.png")
     assert payload["item"]["archetype"]["archetype_label"] == "Primary Creator"
     assert payload["item"]["similar_players"][0]["player_name"] == "Jalen Brunson"
@@ -940,6 +1331,34 @@ def test_api_player_game_log_with_limit() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert len(payload["item"]["games"]) == 3
+
+
+def test_api_player_game_log_with_date_range() -> None:
+    client = build_client()
+    response = client.get(
+        "/api/players/7/game-log?start_date=2026-02-02&end_date=2026-02-03"
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["item"]["date_range"] == {
+        "start_date": "2026-02-02",
+        "end_date": "2026-02-03",
+    }
+    assert [game["game_date"] for game in payload["item"]["games"]] == [
+        "2026-02-02",
+        "2026-02-03",
+    ]
+
+
+def test_api_player_game_log_rejects_reversed_date_range() -> None:
+    client = build_client()
+    response = client.get(
+        "/api/players/7/game-log?start_date=2026-02-03&end_date=2026-02-02"
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "start_date must be on or before end_date"
 
 
 def test_api_player_game_log_404() -> None:

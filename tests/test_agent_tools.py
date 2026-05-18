@@ -1,0 +1,290 @@
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from app.agent.catalog import load_semantic_catalog
+from app.agent.tools import StatsToolRunner
+
+
+class ToolFakeRepository:
+    def search_players(self, query: str, limit: int = 10) -> list[dict]:
+        return [
+            {
+                "player_id": 7,
+                "player_name": "Tyrese Maxey",
+                "latest_team_abbr": "PHI",
+                "games_sampled": 12,
+                "sample_status": "ready",
+                "overall_rank": 12,
+            }
+        ][:limit]
+
+    def get_player_detail(self, player_id: int) -> dict | None:
+        if player_id != 7:
+            return None
+        return {
+            "player": {
+                "player_id": 7,
+                "player_name": "Tyrese Maxey",
+                "team_abbr": "PHI",
+                "games_sampled": 12,
+                "sample_status": "ready",
+                "overall_rank": 12,
+            },
+            "sample": {"games_sampled": 12, "is_qualified": True},
+            "availability_state": "fresh",
+            "availability_reason": None,
+            "reason_summary": "recent box score production: +5.2",
+            "trend": {"status": "rising", "delta": 6.4},
+            "recent_form": [],
+            "stat_percentiles": [
+                {"key": "pts", "label": "PTS", "average": 25.8, "percentile": 91.0}
+            ],
+            "chart_baselines": {},
+            "trends": [{"stat": "PTS", "label": "PTS", "delta": 6.4}],
+            "game_log": self.get_player_game_log(7, limit=2),
+            "archetype": {"archetype_label": "Primary Creator"},
+            "similar_players": [{"player_id": 11, "player_name": "Jalen Brunson"}],
+        }
+
+    def get_player_game_log(
+        self,
+        player_id: int,
+        limit: int = 30,
+        *,
+        start_date: str | None = None,
+        end_date: str | None = None,
+    ) -> dict | None:
+        if player_id != 7:
+            return None
+        games = [
+            {
+                "game_date": "2026-02-01",
+                "matchup": "PHI vs. NYK",
+                "wl": "W",
+                "team_abbr": "PHI",
+                "opponent_abbr": "NYK",
+                "pts": "28",
+                "reb": "5",
+                "ast": "7",
+                "stl": "1",
+                "blk": "0",
+                "tov": "2",
+            },
+            {
+                "game_date": "2026-02-03",
+                "matchup": "PHI @ BOS",
+                "wl": "L",
+                "team_abbr": "PHI",
+                "opponent_abbr": "BOS",
+                "pts": "31",
+                "reb": "4",
+                "ast": "8",
+                "stl": "2",
+                "blk": "1",
+                "tov": "3",
+            },
+            {
+                "game_date": "2026-02-10",
+                "matchup": "PHI vs. LAL",
+                "wl": "W",
+                "team_abbr": "PHI",
+                "opponent_abbr": "LAL",
+                "pts": "24",
+                "reb": "3",
+                "ast": "6",
+                "stl": "1",
+                "blk": "0",
+                "tov": "1",
+            },
+        ]
+        if start_date:
+            games = [game for game in games if game["game_date"] >= start_date]
+        if end_date:
+            games = [game for game in games if game["game_date"] <= end_date]
+        games = games[:limit]
+        return {
+            "player_id": 7,
+            "player_name": "Tyrese Maxey",
+            "season": "2025-26",
+            "games": games,
+            "date_range": {"start_date": start_date, "end_date": end_date},
+        }
+
+    def get_metric_leaders(self, metric: str, limit: int = 10) -> list[dict]:
+        return [
+            {
+                "player_id": 7,
+                "player_name": "Tyrese Maxey",
+                "metric_key": metric,
+                "metric_label": metric.upper(),
+                "metric_value": 28.4,
+                "percentile": 91.0,
+            }
+        ][:limit]
+
+    def get_player_metric_percentile(
+        self, player_id: int, metric: str, min_games: int = 5
+    ) -> dict | None:
+        if player_id != 7:
+            return None
+        return {
+            "season": "2025-26",
+            "player_id": 7,
+            "player_name": "Tyrese Maxey",
+            "team_abbr": "PHI",
+            "games_sampled": 12,
+            "metric_key": metric,
+            "metric_label": "Attributed Points",
+            "metric_value": 42.2,
+            "min_games": min_games,
+            "cohort_rank": 8,
+            "percentile": 94.0,
+            "cohort_size": 100,
+            "cohort_avg": 24.0,
+            "player_count": 500,
+            "max_games_sampled": 82,
+            "in_requested_cohort": True,
+        }
+
+
+def test_semantic_catalog_resolves_typo_aliases() -> None:
+    catalog = load_semantic_catalog()
+
+    assert catalog.resolve_metric("rbs").key == "reb"
+    assert catalog.resolve_metric("blcks").key == "blk"
+    assert catalog.resolve_metric("turnovers").key == "tov"
+    points_created = catalog.resolve_metric("points + assists * 2")
+    assert points_created.key == "points_created"
+    assert points_created.formula == "pts + ast * 2"
+    assert points_created.formula_variables == ("ast", "pts")
+
+
+def test_agent_game_log_tool_returns_chart_payload() -> None:
+    runner = StatsToolRunner(ToolFakeRepository())
+
+    payload = runner.get_player_game_log(
+        7,
+        ["points", "assists", "attributed_points"],
+        limit=2,
+    )
+
+    assert payload["status"] == "ok"
+    assert payload["rows"][0]["metrics"] == {
+        "pts": 28.0,
+        "ast": 7.0,
+        "points_created": 42.0,
+    }
+    assert payload["charts"][0]["type"] == "line"
+    assert payload["charts"][0]["series"][0]["label"] == "PTS"
+    assert payload["charts"][0]["series"][2]["label"] == "Attributed Points"
+    assert payload["charts"][0]["series"][2]["points"][1]["y"] == 47.0
+
+
+def test_agent_game_log_tool_applies_date_range_filter() -> None:
+    runner = StatsToolRunner(ToolFakeRepository())
+
+    payload = runner.get_player_game_log(
+        7,
+        ["points", "assists"],
+        limit=10,
+        start_date="2026-02-03",
+        end_date="2026-02-03",
+    )
+
+    assert payload["status"] == "ok"
+    assert payload["date_range"] == {
+        "start_date": "2026-02-03",
+        "end_date": "2026-02-03",
+    }
+    assert payload["games_returned"] == 1
+    assert payload["rows"][0]["game_date"] == "2026-02-03"
+    assert payload["rows"][0]["metrics"] == {"pts": 31.0, "ast": 8.0}
+
+
+def test_agent_game_log_tool_rejects_invalid_date_range() -> None:
+    runner = StatsToolRunner(ToolFakeRepository())
+
+    payload = runner.get_player_game_log(
+        7,
+        ["points"],
+        limit=10,
+        start_date="2026-02-10",
+        end_date="2026-02-03",
+    )
+
+    assert payload["status"] == "error"
+    assert payload["message"] == "start_date must be on or before end_date."
+
+
+def test_agent_trends_tool_computes_points_created_from_game_log() -> None:
+    runner = StatsToolRunner(ToolFakeRepository())
+
+    payload = runner.get_player_trends(7, ["attributed_points"])
+
+    assert payload["status"] == "ok"
+    assert payload["trends"][0]["stat"] == "POINTS_CREATED"
+    assert payload["trends"][0]["formula"] == "PTS + AST * 2"
+    assert payload["trends"][0]["recent_avg"] == 44.5
+    assert payload["charts"][0]["series"][0]["points"] == [
+        {
+            "x": "2026-02-01",
+            "y": 42.0,
+            "meta": "PHI vs. NYK W AST 7 · PTS 28 formula PTS + AST * 2",
+        },
+        {
+            "x": "2026-02-03",
+            "y": 47.0,
+            "meta": "PHI @ BOS L AST 8 · PTS 31 formula PTS + AST * 2",
+        },
+    ]
+
+
+def test_agent_trends_tool_computes_from_date_filtered_game_log() -> None:
+    runner = StatsToolRunner(ToolFakeRepository())
+
+    payload = runner.get_player_trends(
+        7,
+        ["points"],
+        start_date="2026-02-03",
+        end_date="2026-02-10",
+    )
+
+    assert payload["status"] == "ok"
+    assert payload["date_range"] == {
+        "start_date": "2026-02-03",
+        "end_date": "2026-02-10",
+    }
+    assert payload["trends"][0]["recent_games"] == 2
+    assert payload["trends"][0]["recent_avg"] == 27.5
+    assert payload["charts"][0]["series"][0]["points"] == [
+        {"x": "2026-02-03", "y": 31.0, "meta": "PHI @ BOS L"},
+        {"x": "2026-02-10", "y": 24.0, "meta": "PHI vs. LAL W"},
+    ]
+
+
+def test_agent_ranking_tool_rejects_unknown_metric() -> None:
+    runner = StatsToolRunner(ToolFakeRepository())
+
+    payload = runner.search_rankings("pts; drop table", limit=5)
+
+    assert payload["status"] == "error"
+    assert payload["invalid_metrics"] == ["pts; drop table"]
+
+
+def test_agent_calculates_points_created_percentile_alias() -> None:
+    runner = StatsToolRunner(ToolFakeRepository())
+
+    payload = runner.calculate_player_percentile(
+        7,
+        "points + assists * 2",
+        min_games=10,
+    )
+
+    assert payload["status"] == "ok"
+    assert payload["metric"]["key"] == "points_created"
+    assert payload["metric_value"] == 42.2
+    assert payload["percentile"] == 94.0

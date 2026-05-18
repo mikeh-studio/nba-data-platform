@@ -19,6 +19,11 @@ resource "google_bigquery_dataset" "gold" {
   location   = var.bucket_location
 }
 
+resource "google_bigquery_dataset" "agent" {
+  dataset_id = var.agent_dataset
+  location   = var.bucket_location
+}
+
 resource "google_bigquery_dataset" "metadata" {
   dataset_id = var.metadata_dataset
   location   = var.bucket_location

@@ -48,6 +48,7 @@ def test_prepare_environment_applies_pipeline_defaults(tmp_path: Path) -> None:
     assert env["BQ_DATASET_BRONZE"] == "nba_bronze"
     assert env["BQ_DATASET_SILVER"] == "nba_silver"
     assert env["BQ_DATASET_GOLD"] == "nba_gold"
+    assert env["BQ_DATASET_AGENT"] == "nba_agent"
     assert env["BQ_METADATA_DATASET"] == "nba_metadata"
     assert env["BQ_LOCATION"] == "US"
     assert env["NBA_BRONZE_BOOTSTRAP_MODE"] == "auto"

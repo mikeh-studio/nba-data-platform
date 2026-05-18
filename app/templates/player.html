@@ -50,6 +50,22 @@
         Track player
       </button>
     </div>
+    <form class="player-search-form" data-player-search-form role="search">
+      <label class="sr-only" for="player-search-input">Find qualified player</label>
+      <div class="player-search-shell">
+        <input
+          id="player-search-input"
+          class="input"
+          name="q"
+          type="search"
+          placeholder="Find qualified player"
+          autocomplete="off"
+          data-player-search-input
+        />
+        <div class="player-search-results" data-player-search-results hidden></div>
+      </div>
+      <button class="button secondary" type="submit">Search</button>
+    </form>
     {% if health.status != "fresh" %}
       <div class="notice">
         <strong>Player outlook is using degraded freshness.</strong>
@@ -95,41 +111,154 @@
         </details>
       </article>
 
-      <article class="card">
+      <article class="card performance-card" data-tab-group>
         <div class="card-header">
-          <h2>Recent Windows</h2>
+          <div>
+            <h2>Performance</h2>
+            <p class="meta">{{ player_detail.sample.games_sampled or 0 }} games sampled · {{ player_detail.sample.sample_status }}</p>
+          </div>
+          <div class="card-header-actions">
+            <span class="status">{{ player_detail.sample.qualification_games }}+ game page</span>
+          </div>
         </div>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Window</th>
-              <th>State</th>
-              <th>Box Score Index</th>
-              <th>PTS</th>
-              <th>REB</th>
-              <th>AST</th>
-              <th>3PM</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for item in player_detail.recent_form %}
-              <tr>
-                <td>{{ item.window_label }}</td>
-                <td>{{ item.state }}</td>
-                <td>{{ item.fantasy_proxy }}</td>
-                <td>{{ item.avg_pts }}</td>
-                <td>{{ item.avg_reb }}</td>
-                <td>{{ item.avg_ast }}</td>
-                <td>{{ item.avg_fg3m }}</td>
-              </tr>
-              {% if item.state_reason %}
+        {% if player_detail.sample.sample_warning %}
+          <div class="notice">
+            <strong>Sample note</strong>
+            <p>{{ player_detail.sample.sample_warning }}</p>
+          </div>
+        {% endif %}
+        <div class="tab-list" role="tablist">
+          <button class="tab-button is-active" type="button" role="tab" aria-selected="true" data-tab-target="trend">Trend</button>
+          <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab-target="game-log">Game Log</button>
+          <button class="tab-button" type="button" role="tab" aria-selected="false" data-tab-target="windows">Recent Windows</button>
+        </div>
+        <section class="tab-panel is-active" data-tab-panel="trend">
+          <div class="stat-toggle-group" data-player-trend-controls aria-label="Trend stat">
+            <button class="tab-button is-active" type="button" data-stat-key="pts">PTS</button>
+            <button class="tab-button" type="button" data-stat-key="reb">REB</button>
+            <button class="tab-button" type="button" data-stat-key="ast">AST</button>
+            <button class="tab-button" type="button" data-stat-key="stl">STL</button>
+            <button class="tab-button" type="button" data-stat-key="blk">BLK</button>
+            <button class="tab-button" type="button" data-stat-key="tov">TOV</button>
+          </div>
+          <div class="trend-chart" data-player-trend-chart>
+            <script type="application/json" data-trend-data>{{ player_detail.game_log.games | tojson }}</script>
+            <script type="application/json" data-baseline-data>{{ player_detail.chart_baselines | tojson }}</script>
+          </div>
+          {% if player_detail.trends %}
+            <div class="table-scroll">
+              <table class="data-table compact">
+                <thead>
+                  <tr>
+                    <th>Stat</th>
+                    <th>Recent</th>
+                    <th>Prior</th>
+                    <th>Delta</th>
+                    <th>Change</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for item in player_detail.trends %}
+                    <tr>
+                      <td>{{ item.label }}</td>
+                      <td>{{ item.recent_avg }}</td>
+                      <td>{{ item.prior_avg }}</td>
+                      <td class="{% if item.direction_is_good %}good{% elif item.direction_is_good is not none %}bad{% endif %}">{{ item.delta }}</td>
+                      <td>{{ item.pct_change }}%</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+        </section>
+        <section class="tab-panel" data-tab-panel="game-log" hidden>
+          {% if player_detail.game_log.games %}
+            <div class="table-scroll">
+              <table class="data-table game-log-table">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Matchup</th>
+                    <th>MIN</th>
+                    <th>PTS</th>
+                    <th>REB</th>
+                    <th>AST</th>
+                    <th>STL</th>
+                    <th>BLK</th>
+                    <th>TOV</th>
+                    <th>3PM</th>
+                    <th>FG</th>
+                    <th>FT</th>
+                    <th>Box</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for game in player_detail.game_log.games|reverse %}
+                    <tr>
+                      <td>{{ game.game_date }}</td>
+                      <td>
+                        {{ game.matchup or game.opponent_abbr }}
+                        {% if game.wl %}<span class="meta">{{ game.wl }}</span>{% endif %}
+                      </td>
+                      <td>{{ game.min }}</td>
+                      <td>{{ game.pts }}</td>
+                      <td>{{ game.reb }}</td>
+                      <td>{{ game.ast }}</td>
+                      <td>{{ game.stl }}</td>
+                      <td>{{ game.blk }}</td>
+                      <td>{{ game.tov }}</td>
+                      <td>{{ game.fg3m }}</td>
+                      <td>{{ game.fgm }}/{{ game.fga }}</td>
+                      <td>{{ game.ftm }}/{{ game.fta }}</td>
+                      <td>{{ game.fantasy_points_simple }}</td>
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% else %}
+            <div class="empty-state">
+              <strong>Game log is unavailable.</strong>
+              <p class="meta">No game-level rows are available for this qualified player yet.</p>
+            </div>
+          {% endif %}
+        </section>
+        <section class="tab-panel" data-tab-panel="windows" hidden>
+          <div class="table-scroll">
+            <table class="data-table">
+              <thead>
                 <tr>
-                  <td colspan="7" class="meta">{{ item.state_reason }}</td>
+                  <th>Window</th>
+                  <th>State</th>
+                  <th>Box Score Index</th>
+                  <th>PTS</th>
+                  <th>REB</th>
+                  <th>AST</th>
+                  <th>3PM</th>
                 </tr>
-              {% endif %}
-            {% endfor %}
-          </tbody>
-        </table>
+              </thead>
+              <tbody>
+                {% for item in player_detail.recent_form %}
+                  <tr>
+                    <td>{{ item.window_label }}</td>
+                    <td>{{ item.state }}</td>
+                    <td>{{ item.fantasy_proxy }}</td>
+                    <td>{{ item.avg_pts }}</td>
+                    <td>{{ item.avg_reb }}</td>
+                    <td>{{ item.avg_ast }}</td>
+                    <td>{{ item.avg_fg3m }}</td>
+                  </tr>
+                  {% if item.state_reason %}
+                    <tr>
+                      <td colspan="7" class="meta">{{ item.state_reason }}</td>
+                    </tr>
+                  {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
       </article>
 
       <article class="card">
@@ -162,6 +291,7 @@
                   {% for trait in item.contrasting_traits %}
                     <span class="chip">Diff {{ trait }}</span>
                   {% endfor %}
+                  <a class="button-link secondary" href="/compare?player_a_id={{ player_detail.player.player_id }}&player_b_id={{ item.player_id }}">Compare</a>
                 </div>
               </article>
             {% endfor %}
@@ -244,31 +374,29 @@
 
       <article class="card">
         <div class="card-header">
-          <h2>Category Profile</h2>
+          <h2>League Percentiles</h2>
         </div>
-        {% if player_detail.panel_states.category_profile == "fresh" %}
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Category</th>
-                <th>Impact</th>
-                <th>Tier</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for item in player_detail.category_profile %}
-                <tr>
-                  <td>{{ item.category }}</td>
-                  <td>{{ item.impact_score }}</td>
-                  <td>{{ item.category_tier }}</td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+        {% if player_detail.panel_states.stat_percentiles == "fresh" %}
+          <div class="percentile-list">
+            {% for item in player_detail.stat_percentiles %}
+              <div class="percentile-row">
+                <div class="percentile-row-top">
+                  <span>{{ item.label }}</span>
+                  <span class="mono">{{ item.percentile }}%</span>
+                </div>
+                <div class="percentile-bar" aria-hidden="true">
+                  <span class="percentile-fill" style="width: {{ item.bar_width }}%"></span>
+                </div>
+                <p class="meta">
+                  Avg {{ item.average }}{% if item.direction == "lower" %} · lower turnovers rank higher{% endif %}
+                </p>
+              </div>
+            {% endfor %}
+          </div>
         {% else %}
           <div class="empty-state">
-            <strong>Category profile is unavailable.</strong>
-            <p class="meta">The player identity is present, but category-level z-score context is missing.</p>
+            <strong>Percentiles are unavailable.</strong>
+            <p class="meta">This player needs the qualified league baseline before percentile bars can render.</p>
           </div>
         {% endif %}
       </article>

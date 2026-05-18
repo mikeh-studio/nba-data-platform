@@ -31,6 +31,11 @@ variable "gold_dataset" {
   default = "nba_gold"
 }
 
+variable "agent_dataset" {
+  type    = string
+  default = "nba_agent"
+}
+
 variable "metadata_dataset" {
   type    = string
   default = "nba_metadata"

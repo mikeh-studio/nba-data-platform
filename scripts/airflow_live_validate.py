@@ -37,6 +37,10 @@ GOLD_CONTRACT_TABLES = [
     "player_similarity_feature_input",
 ]
 
+AGENT_CONTRACT_TABLES = [
+    "agent_player_search",
+]
+
 DBT_CONTRACT_SELECTOR = [
     "dim_player",
     "dim_team",
@@ -46,6 +50,7 @@ DBT_CONTRACT_SELECTOR = [
     "fct_player_scoring_contribution",
     "player_recent_form",
     "player_similarity_feature_input",
+    "agent_player_search",
 ]
 
 ACTIVE_RUN_STATES = {"queued", "running"}
@@ -198,6 +203,7 @@ def prepare_environment(
     env.setdefault("BQ_DATASET_BRONZE", "nba_bronze")
     env.setdefault("BQ_DATASET_SILVER", "nba_silver")
     env.setdefault("BQ_DATASET_GOLD", "nba_gold")
+    env.setdefault("BQ_DATASET_AGENT", "nba_agent")
     env.setdefault("BQ_METADATA_DATASET", "nba_metadata")
     env.setdefault("BQ_LOCATION", "US")
     env.setdefault("DBT_TARGET", "dev")
@@ -524,6 +530,7 @@ def query_bigquery_contract(env: Mapping[str, str]) -> dict[str, list[dict[str, 
     )
     bronze_dataset = env.get("BQ_DATASET_BRONZE", "nba_bronze")
     gold_dataset = env.get("BQ_DATASET_GOLD", "nba_gold")
+    agent_dataset = env.get("BQ_DATASET_AGENT", "nba_agent")
 
     def count_table(dataset: str, table: str) -> dict[str, Any]:
         table_id = f"{project_id}.{dataset}.{table}"
@@ -541,6 +548,9 @@ def query_bigquery_contract(env: Mapping[str, str]) -> dict[str, list[dict[str, 
             count_table(bronze_dataset, table) for table in BRONZE_CONTRACT_TABLES
         ],
         "gold": [count_table(gold_dataset, table) for table in GOLD_CONTRACT_TABLES],
+        "agent": [
+            count_table(agent_dataset, table) for table in AGENT_CONTRACT_TABLES
+        ],
     }
 
 

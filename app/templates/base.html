@@ -113,6 +113,60 @@
         color: var(--ink);
         background: rgba(30, 35, 41, 0.92);
       }
+      .player-search-form {
+        position: relative;
+        display: flex;
+        gap: 0.6rem;
+        align-items: flex-start;
+        max-width: 42rem;
+      }
+      .player-search-shell {
+        position: relative;
+        flex: 1 1 22rem;
+        min-width: 16rem;
+      }
+      .player-search-shell .input {
+        width: 100%;
+      }
+      .nav-player-search {
+        margin-left: auto;
+        max-width: 28rem;
+      }
+      .player-search-results {
+        position: absolute;
+        z-index: 20;
+        top: calc(100% + 0.4rem);
+        left: 0;
+        right: 0;
+        display: grid;
+        gap: 0.35rem;
+        max-height: 24rem;
+        overflow: auto;
+        padding: 0.45rem;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgba(15, 17, 19, 0.98);
+        box-shadow: 0 18px 44px rgba(0, 0, 0, 0.3);
+      }
+      .player-search-result {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        gap: 0.75rem;
+        align-items: center;
+        width: 100%;
+        padding: 0.65rem;
+        color: var(--ink);
+        text-align: left;
+        border: 1px solid transparent;
+        border-radius: 12px;
+        background: transparent;
+        cursor: pointer;
+      }
+      .player-search-result:hover,
+      .player-search-result:focus-visible {
+        border-color: rgba(240, 78, 35, 0.45);
+        background: rgba(240, 78, 35, 0.1);
+      }
       .button-link,
       .button,
       .track-button {
@@ -391,6 +445,17 @@
         border-collapse: collapse;
         font-size: 0.85rem;
       }
+      .table-scroll {
+        width: 100%;
+        overflow-x: auto;
+      }
+      .data-table.compact th,
+      .data-table.compact td {
+        padding: 0.55rem 0.4rem 0.55rem 0;
+      }
+      .game-log-table {
+        min-width: 860px;
+      }
       .data-table th,
       .data-table td {
         padding: 0.7rem 0;
@@ -431,6 +496,125 @@
       .metric-value {
         font-size: 1rem;
         color: var(--highlight);
+      }
+      .good {
+        color: var(--success);
+      }
+      .bad {
+        color: var(--danger);
+      }
+      .tab-list,
+      .stat-toggle-group {
+        display: flex;
+        gap: 0.45rem;
+        flex-wrap: wrap;
+      }
+      .tab-button {
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 0.5rem 0.72rem;
+        color: var(--muted);
+        background: rgba(255, 255, 255, 0.03);
+        cursor: pointer;
+      }
+      .tab-button:hover,
+      .tab-button:focus-visible,
+      .tab-button.is-active {
+        color: var(--highlight);
+        border-color: rgba(240, 78, 35, 0.5);
+        background: rgba(240, 78, 35, 0.13);
+      }
+      .tab-panel {
+        display: grid;
+        gap: 0.9rem;
+      }
+      .tab-panel[hidden] {
+        display: none;
+      }
+      .trend-chart {
+        min-height: 230px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background:
+          linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 100%),
+          rgba(30, 35, 41, 0.52);
+        overflow: hidden;
+      }
+      .trend-chart svg {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      .trend-axis,
+      .trend-label {
+        fill: var(--muted);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.72rem;
+      }
+      .trend-line {
+        fill: none;
+        stroke: var(--accent-hot);
+        stroke-width: 3;
+      }
+      .trend-area {
+        fill: rgba(240, 78, 35, 0.14);
+      }
+      .trend-dot {
+        fill: var(--highlight);
+        stroke: var(--accent);
+        stroke-width: 2;
+      }
+      .trend-baseline {
+        stroke: var(--success);
+        stroke-width: 2;
+        stroke-dasharray: 7 6;
+      }
+      .trend-baseline-label,
+      .trend-tooltip-text {
+        fill: var(--ink);
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.72rem;
+      }
+      .trend-tooltip {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 120ms ease;
+      }
+      .trend-point:hover .trend-tooltip,
+      .trend-point:focus .trend-tooltip {
+        opacity: 1;
+      }
+      .trend-tooltip-box {
+        fill: rgba(15, 17, 19, 0.96);
+        stroke: rgba(231, 224, 212, 0.24);
+        stroke-width: 1;
+      }
+      .percentile-list {
+        display: grid;
+        gap: 0.85rem;
+      }
+      .percentile-row {
+        display: grid;
+        gap: 0.35rem;
+      }
+      .percentile-row-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 0.75rem;
+        align-items: baseline;
+      }
+      .percentile-bar {
+        height: 0.62rem;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .percentile-fill {
+        display: block;
+        height: 100%;
+        min-width: 0.25rem;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--accent), var(--success));
       }
       details.explain {
         border-top: 1px solid rgba(255, 255, 255, 0.08);
@@ -526,14 +710,19 @@
           border-radius: 18px;
         }
         .search-form,
-        .compare-form {
+        .compare-form,
+        .player-search-form {
           width: 100%;
         }
         .search-form input,
         .compare-form .input,
-        .select {
+        .select,
+        .player-search-shell {
           flex: 1 1 auto;
           min-width: 0;
+        }
+        .player-search-form {
+          flex-wrap: wrap;
         }
       }
     </style>
@@ -548,9 +737,24 @@
           </div>
           <div class="nav-links">
             <a href="/">Dashboard</a>
+            <a href="/ask">Ask</a>
             <a href="/visualize">Visualize</a>
             <a href="/compare">Compare</a>
             <span class="season-tag">Season {{ season }}</span>
+            <form class="player-search-form nav-player-search" data-player-search-form role="search">
+              <label class="sr-only">Find qualified player</label>
+              <div class="player-search-shell">
+                <input
+                  class="input"
+                  name="q"
+                  type="search"
+                  placeholder="Search players"
+                  autocomplete="off"
+                  data-player-search-input
+                />
+                <div class="player-search-results" data-player-search-results hidden></div>
+              </div>
+            </form>
           </div>
         </nav>
         {% block content %}{% endblock %}

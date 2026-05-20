@@ -5871,6 +5871,7 @@ def write_player_similarity_tables(
     archetype_job_config = bigquery.LoadJobConfig(
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
         schema=_player_archetype_schema(),
+        schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION],
     )
 
     bq_client.load_table_from_dataframe(

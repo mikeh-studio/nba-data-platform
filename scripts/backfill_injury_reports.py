@@ -5,6 +5,7 @@ import argparse
 import datetime as dt
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -33,6 +34,20 @@ DEFAULT_DBT_EXCLUDES = [
     "source:gold_runtime.analysis_snapshots",
     "path:dbt/tests/no_duplicate_analysis_snapshots.sql",
 ]
+SECRET_KEY_PATTERN = (
+    r"password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|"
+    r"secret[_-]?key|private[_-]?key|client[_-]?secret|credential"
+)
+SECRET_ASSIGNMENT_PATTERN = re.compile(
+    rf"(?i)\b({SECRET_KEY_PATTERN})(\s*[=:]\s*)[^\s,;]+"
+)
+SECRET_JSON_PATTERN = re.compile(
+    rf"(?i)([\"'](?:{SECRET_KEY_PATTERN})[\"']\s*:\s*)[\"'][^\"']+[\"']"
+)
+SECRET_AUTH_PATTERN = re.compile(
+    r"(?i)\b(authorization:\s*bearer\s+)[A-Za-z0-9._~+/=-]+"
+)
+SECRET_SK_PATTERN = re.compile(r"\bsk-[A-Za-z0-9_-]{12,}\b")
 
 
 @dataclass(frozen=True)
@@ -219,6 +234,18 @@ def format_command(args: list[str]) -> str:
     return " ".join(shlex.quote(arg) for arg in args)
 
 
+def redact_text(text: str, *, max_chars: int | None = None) -> str:
+    redacted = SECRET_JSON_PATTERN.sub(
+        lambda match: f'{match.group(1)}"<redacted>"', text
+    )
+    redacted = SECRET_ASSIGNMENT_PATTERN.sub(r"\1\2<redacted>", redacted)
+    redacted = SECRET_AUTH_PATTERN.sub(r"\1<redacted>", redacted)
+    redacted = SECRET_SK_PATTERN.sub("sk-<redacted>", redacted)
+    if max_chars is not None and len(redacted) > max_chars:
+        return redacted[-max_chars:]
+    return redacted
+
+
 def resolve_dbt_cmd(root: Path) -> list[str]:
     local_dbt = root / ".venv-airflow" / "bin" / "dbt"
     if local_dbt.exists():
@@ -263,8 +290,8 @@ def run_dbt_injury_build(
         "command": format_command(command),
         "returncode": completed.returncode,
         "elapsed_seconds": round(time.monotonic() - started, 3),
-        "stdout_tail": completed.stdout[-3000:],
-        "stderr_tail": completed.stderr[-3000:],
+        "stdout_tail": redact_text(completed.stdout, max_chars=3000),
+        "stderr_tail": redact_text(completed.stderr, max_chars=3000),
     }
     if completed.returncode != 0:
         raise BackfillError(
@@ -604,14 +631,15 @@ def main() -> int:
     try:
         exit_code, report = run_backfill(args)
     except Exception as exc:
+        error = redact_text(str(exc))
         report = {
             "status": "failed",
-            "error": str(exc),
+            "error": error,
             "completed_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         }
         write_report(output_path, report)
         print(f"Injury backfill report: {output_path}", file=sys.stderr)
-        print(str(exc), file=sys.stderr)
+        print(error, file=sys.stderr)
         return 1
     write_report(output_path, report)
     print(f"Injury backfill report: {output_path}")

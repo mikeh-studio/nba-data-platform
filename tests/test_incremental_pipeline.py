@@ -2275,3 +2275,40 @@ def test_build_player_similarity_outputs_excludes_insufficient_sample_rows():
 
     assert outputs["features"]["player_id"].tolist() == [1, 2]
     assert outputs["archetypes"]["player_id"].tolist() == [1, 2]
+
+
+def test_write_player_similarity_tables_allows_schema_field_additions():
+    class FakeJob:
+        def result(self):
+            return None
+
+    class FakeClient:
+        def __init__(self):
+            self.load_job_configs = []
+
+        def create_table(self, *_args, **_kwargs):
+            return None
+
+        def query(self, *_args, **_kwargs):
+            return FakeJob()
+
+        def load_table_from_dataframe(self, *_args, job_config, **_kwargs):
+            self.load_job_configs.append(job_config)
+            return FakeJob()
+
+    client = FakeClient()
+
+    pipeline.write_player_similarity_tables(
+        client,
+        features_table_id="demo.nba_gold.player_similarity_features",
+        archetypes_table_id="demo.nba_gold.player_archetypes",
+        features_df=pd.DataFrame({"season": ["2025-26"]}),
+        archetypes_df=pd.DataFrame({"season": ["2025-26"]}),
+    )
+
+    assert len(client.load_job_configs) == 2
+    for job_config in client.load_job_configs:
+        assert (
+            pipeline.bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION
+            in job_config.schema_update_options
+        )

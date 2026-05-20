@@ -59,3 +59,18 @@ def test_candidate_summary_records_first_and_last_source_urls() -> None:
     assert summary["first_source_url"].endswith(
         "Injury-Report_2026-05-01_05_00PM.pdf"
     )
+
+
+def test_redact_text_masks_secret_like_values() -> None:
+    text = (
+        'PASSWORD=abc123 token: xyz789 {"api_key": "abc123"} '
+        "Authorization: Bearer bearer123 sk-testredactiontoken12345 normal=value"
+    )
+
+    redacted = backfill.redact_text(text)
+
+    assert "abc123" not in redacted
+    assert "xyz789" not in redacted
+    assert "bearer123" not in redacted
+    assert "sk-testredactiontoken12345" not in redacted
+    assert "normal=value" in redacted

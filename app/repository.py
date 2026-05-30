@@ -1156,6 +1156,10 @@ class WarehouseRepository(Protocol):
 
     def get_similarity_map(self) -> dict[str, Any]: ...
 
+    def get_similarity_neighbors(
+        self, player_id: int, *, limit: int = SIMILARITY_RESULT_LIMIT
+    ) -> dict[str, Any]: ...
+
     def get_health(self) -> dict[str, Any]: ...
 
 
@@ -2414,6 +2418,48 @@ class BigQueryWarehouseRepository:
             "season": SUPPORTED_SEASON,
             "players": players,
             "archetypes": self._summarize_map_archetypes(players),
+        }
+
+    def get_similarity_neighbors(
+        self, player_id: int, *, limit: int = SIMILARITY_RESULT_LIMIT
+    ) -> dict[str, Any]:
+        """Return a player's true cosine-nearest neighbors for the map.
+
+        These come from the served similarity scoring (distance on the
+        normalized vectors), not from 3D proximity — so an edge can point to a
+        player who sits visually far on the projection. That divergence is the
+        honest signal the map is meant to surface.
+        """
+        anchor = self._fetch_similarity_anchor(player_id)
+        if anchor is None:
+            return {
+                "state": STATE_UNAVAILABLE,
+                "reason": "Similarity profile is unavailable.",
+                "player_id": player_id,
+                "player_name": None,
+                "neighbors": [],
+            }
+
+        state, reason, items = self._get_similar_players(
+            player_id, anchor=anchor, limit=limit
+        )
+        neighbors = [
+            {
+                "player_id": item.get("player_id"),
+                "player_name": item.get("player_name"),
+                "team_abbr": item.get("team_abbr"),
+                "archetype_label": item.get("archetype_label"),
+                "similarity_score": item.get("similarity_score"),
+                "shared_traits": item.get("shared_traits", []),
+            }
+            for item in items
+        ]
+        return {
+            "state": state,
+            "reason": reason,
+            "player_id": player_id,
+            "player_name": anchor.get("player_name"),
+            "neighbors": neighbors,
         }
 
     def get_leaderboard(self, limit: int = 10) -> list[dict[str, Any]]:

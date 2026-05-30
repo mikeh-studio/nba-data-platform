@@ -86,7 +86,12 @@ thresholds, experimental scoring rules, or model-selection heuristics.
 the model output. The feature table load allows additive schema changes so new
 `norm_*` and `proj_*` fields can be published without dropping the existing
 table. The 3D projection is served read-only at `/similarity-map` (Plotly
-`scatter3d`) and `/api/similarity-map`.
+`scatter3d`) and `/api/similarity-map`. Selecting a player calls
+`/api/similarity-map/neighbors/{player_id}`, which returns the player's true
+cosine-nearest matches from the served similarity scoring. The map draws edges
+to those matches by their projected coordinates, so an edge can point to a
+player who sits visually far away — the projection is a map, the cosine score
+is the truth.
 
 ## Validation
 

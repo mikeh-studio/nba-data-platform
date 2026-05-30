@@ -824,3 +824,47 @@ def test_get_similarity_map_returns_empty_on_bigquery_error(monkeypatch) -> None
 
     assert result["players"] == []
     assert result["archetypes"] == []
+
+
+def test_get_similarity_neighbors_returns_anchor_and_neighbors(monkeypatch) -> None:
+    repo = _build_repository()
+    monkeypatch.setattr(
+        repo, "_fetch_similarity_anchor", lambda pid: {"player_name": "Anchor"}
+    )
+
+    def fake_similar(player_id, *, anchor=None, limit=6):
+        assert anchor == {"player_name": "Anchor"}
+        assert limit == 4
+        return (
+            "fresh",
+            None,
+            [
+                {
+                    "player_id": 2,
+                    "player_name": "Match",
+                    "team_abbr": "BBB",
+                    "archetype_label": "Scoring Guard",
+                    "similarity_score": 0.9,
+                    "shared_traits": ["scoring"],
+                }
+            ],
+        )
+
+    monkeypatch.setattr(repo, "_get_similar_players", fake_similar)
+    result = repo.get_similarity_neighbors(7, limit=4)
+
+    assert result["player_id"] == 7
+    assert result["player_name"] == "Anchor"
+    assert result["state"] == "fresh"
+    assert result["neighbors"][0]["player_id"] == 2
+    assert result["neighbors"][0]["similarity_score"] == 0.9
+
+
+def test_get_similarity_neighbors_unavailable_when_anchor_missing(monkeypatch) -> None:
+    repo = _build_repository()
+    monkeypatch.setattr(repo, "_fetch_similarity_anchor", lambda pid: None)
+
+    result = repo.get_similarity_neighbors(7)
+
+    assert result["state"] == "unavailable"
+    assert result["neighbors"] == []

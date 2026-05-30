@@ -1012,6 +1012,24 @@ class FakeRepository(WarehouseRepository):
             "archetypes": [{"archetype_label": "Scoring Guard", "count": 1}],
         }
 
+    def get_similarity_neighbors(self, player_id: int, *, limit: int = 6) -> dict:
+        return {
+            "state": "fresh",
+            "reason": None,
+            "player_id": player_id,
+            "player_name": "Alpha Guard",
+            "neighbors": [
+                {
+                    "player_id": 2,
+                    "player_name": "Beta Guard",
+                    "team_abbr": "BBB",
+                    "archetype_label": "Scoring Guard",
+                    "similarity_score": 0.91,
+                    "shared_traits": ["scoring volume"],
+                }
+            ],
+        }
+
     def get_health(self) -> dict:
         return {
             "season": "2025-26",
@@ -1713,3 +1731,31 @@ def test_similarity_map_page_smoke() -> None:
     assert "Player Similarity Map" in response.text
     assert "/static/similarity_map.js" in response.text
     assert "plotly-gl3d" in response.text
+
+
+def test_api_similarity_map_neighbors_returns_ranked_matches() -> None:
+    client = build_client()
+    response = client.get("/api/similarity-map/neighbors/1?limit=5")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["player_id"] == 1
+    assert payload["neighbors"][0]["player_name"] == "Beta Guard"
+    assert payload["neighbors"][0]["similarity_score"] == 0.91
+
+
+def test_api_similarity_map_neighbors_rejects_out_of_range_limit() -> None:
+    client = build_client()
+    response = client.get("/api/similarity-map/neighbors/1?limit=99")
+
+    assert response.status_code == 422
+
+
+def test_similarity_map_page_has_search_and_panel() -> None:
+    client = build_client()
+    response = client.get("/similarity-map")
+
+    assert response.status_code == 200
+    assert 'id="map-search-input"' in response.text
+    assert 'id="map-panel"' in response.text
+    assert "true nearest matches" in response.text

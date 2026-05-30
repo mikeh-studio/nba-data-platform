@@ -21,14 +21,36 @@
   const FONT_COLOR = "#e7e0d4";
   const GRID_COLOR = "rgba(231, 224, 212, 0.12)";
   const AXIS_BG = "rgba(0, 0, 0, 0)";
+  const EDGE_COLOR = "#f0c823";
+  const ANCHOR_COLOR = "#ffffff";
+  const DIM_OPACITY = 0.12;
+  const BASE_OPACITY = 0.85;
 
   const plotEl = document.getElementById("similarity-plot");
   const metaEl = document.getElementById("map-meta");
   const noteEl = document.getElementById("map-note");
+  const layoutEl = document.querySelector(".map-layout");
+  const panelEl = document.getElementById("map-panel");
+  const panelName = document.getElementById("map-panel-name");
+  const panelArchetype = document.getElementById("map-panel-archetype");
+  const panelStatus = document.getElementById("map-panel-status");
+  const panelDetail = document.getElementById("map-panel-detail");
+  const neighborListEl = document.getElementById("map-neighbor-list");
+  const datalistEl = document.getElementById("map-player-list");
+  const searchForm = document.getElementById("map-search-form");
+  const searchInput = document.getElementById("map-search-input");
+  const clearBtn = document.getElementById("map-clear-btn");
 
   if (!plotEl) {
     return;
   }
+
+  // Populated after the projection loads.
+  const playerById = new Map();
+  const idByName = new Map();
+  let baseTraceCount = 0;
+  let extraIndices = [];
+  let selectedId = null;
 
   function setMeta(text) {
     if (metaEl) {
@@ -69,11 +91,6 @@
     if (player.archetype_label) {
       lines.push(player.archetype_label);
     }
-    if (typeof player.cluster_confidence === "number") {
-      lines.push(
-        "Cluster fit " + Math.round(player.cluster_confidence * 100) + "%",
-      );
-    }
     if (Array.isArray(player.top_traits) && player.top_traits.length) {
       lines.push(player.top_traits.join(", "));
     }
@@ -91,7 +108,6 @@
       byLabel.get(label).push(player);
     });
 
-    // Preserve API archetype ordering, then any labels not in the summary.
     const labels = order.filter((label) => byLabel.has(label));
     byLabel.forEach((_, label) => {
       if (!labels.includes(label)) {
@@ -114,7 +130,7 @@
         marker: {
           size: markerSizes(group),
           color: ARCHETYPE_COLORS[index % ARCHETYPE_COLORS.length],
-          opacity: 0.85,
+          opacity: BASE_OPACITY,
           line: { width: 0 },
         },
       };
@@ -130,6 +146,257 @@
       showbackground: true,
       tickfont: { color: FONT_COLOR, size: 10 },
     };
+  }
+
+  function baseIndices() {
+    const indices = [];
+    for (let i = 0; i < baseTraceCount; i += 1) {
+      indices.push(i);
+    }
+    return indices;
+  }
+
+  function clearExtras() {
+    if (extraIndices.length) {
+      window.Plotly.deleteTraces(plotEl, extraIndices);
+      extraIndices = [];
+    }
+  }
+
+  function formatScore(score) {
+    if (typeof score !== "number") {
+      return "–";
+    }
+    return Math.round(score * 100) + "%";
+  }
+
+  function renderPanel(anchor, payload) {
+    const neighbors = (payload.neighbors || []).filter(
+      (n) => typeof n.player_id === "number" || typeof n.player_id === "string",
+    );
+    panelName.textContent = anchor.player_name || payload.player_name || "Player";
+    panelArchetype.textContent = anchor.archetype_label || "";
+    panelDetail.setAttribute("href", "/players/" + anchor.player_id);
+
+    if (!neighbors.length) {
+      panelStatus.textContent =
+        payload.reason || "No similar-player matches are available.";
+    } else {
+      panelStatus.textContent =
+        "Top " + neighbors.length + " stat-profile matches";
+    }
+
+    neighborListEl.innerHTML = "";
+    neighbors.forEach((neighbor) => {
+      const item = document.createElement("li");
+      item.className = "map-neighbor";
+
+      const left = document.createElement("span");
+      left.className = "map-neighbor-name";
+      const team = neighbor.team_abbr ? " · " + neighbor.team_abbr : "";
+      left.textContent = (neighbor.player_name || "Unknown") + team;
+
+      const right = document.createElement("span");
+      right.className = "map-neighbor-score";
+      right.textContent = formatScore(neighbor.similarity_score);
+
+      item.appendChild(left);
+      item.appendChild(right);
+      if (playerById.has(neighbor.player_id)) {
+        item.addEventListener("click", () => selectPlayer(neighbor.player_id));
+      } else {
+        item.style.cursor = "default";
+      }
+      neighborListEl.appendChild(item);
+    });
+
+    panelEl.hidden = false;
+    if (layoutEl) {
+      layoutEl.classList.add("has-selection");
+    }
+    if (clearBtn) {
+      clearBtn.hidden = false;
+    }
+  }
+
+  function drawSelection(anchor, payload) {
+    clearExtras();
+
+    const segX = [];
+    const segY = [];
+    const segZ = [];
+    const nx = [];
+    const ny = [];
+    const nz = [];
+    const nText = [];
+
+    (payload.neighbors || []).forEach((neighbor) => {
+      const match = playerById.get(neighbor.player_id);
+      if (!match) {
+        return;
+      }
+      segX.push(anchor.x, match.x, null);
+      segY.push(anchor.y, match.y, null);
+      segZ.push(anchor.z, match.z, null);
+      nx.push(match.x);
+      ny.push(match.y);
+      nz.push(match.z);
+      nText.push(
+        "<b>" +
+          (neighbor.player_name || "Unknown") +
+          "</b><br>Similarity " +
+          formatScore(neighbor.similarity_score),
+      );
+    });
+
+    const edgesTrace = {
+      type: "scatter3d",
+      mode: "lines",
+      x: segX,
+      y: segY,
+      z: segZ,
+      line: { color: EDGE_COLOR, width: 3 },
+      opacity: 0.7,
+      hoverinfo: "skip",
+      showlegend: false,
+    };
+    const neighborTrace = {
+      type: "scatter3d",
+      mode: "markers",
+      x: nx,
+      y: ny,
+      z: nz,
+      text: nText,
+      hovertemplate: "%{text}<extra></extra>",
+      marker: {
+        size: 7,
+        color: EDGE_COLOR,
+        line: { color: "#1a1a1a", width: 1 },
+      },
+      showlegend: false,
+    };
+    const anchorTrace = {
+      type: "scatter3d",
+      mode: "markers",
+      x: [anchor.x],
+      y: [anchor.y],
+      z: [anchor.z],
+      text: ["<b>" + (anchor.player_name || "Player") + "</b>"],
+      hovertemplate: "%{text}<extra></extra>",
+      marker: {
+        size: 12,
+        color: ANCHOR_COLOR,
+        line: { color: "#f04e23", width: 2 },
+      },
+      showlegend: false,
+    };
+
+    window.Plotly.addTraces(plotEl, [edgesTrace, neighborTrace, anchorTrace]);
+    extraIndices = [baseTraceCount, baseTraceCount + 1, baseTraceCount + 2];
+    window.Plotly.restyle(plotEl, { "marker.opacity": DIM_OPACITY }, baseIndices());
+  }
+
+  function selectPlayer(playerId) {
+    const match = playerById.get(playerId);
+    if (!match) {
+      return;
+    }
+    selectedId = playerId;
+    if (searchInput) {
+      searchInput.value = match.player_name || "";
+    }
+
+    fetch("/api/similarity-map/neighbors/" + encodeURIComponent(playerId))
+      .then((response) => {
+        if (!response.ok) {
+          throw new Error("Request failed: " + response.status);
+        }
+        return response.json();
+      })
+      .then((payload) => {
+        if (selectedId !== playerId) {
+          return; // a newer selection won
+        }
+        drawSelection(match, payload);
+        renderPanel(match, payload);
+      })
+      .catch(() => {
+        drawSelection(match, { neighbors: [] });
+        renderPanel(match, {
+          neighbors: [],
+          reason: "Could not load similar players.",
+        });
+      });
+  }
+
+  function clearSelection() {
+    selectedId = null;
+    clearExtras();
+    window.Plotly.restyle(plotEl, { "marker.opacity": BASE_OPACITY }, baseIndices());
+    if (panelEl) {
+      panelEl.hidden = true;
+    }
+    if (layoutEl) {
+      layoutEl.classList.remove("has-selection");
+    }
+    if (clearBtn) {
+      clearBtn.hidden = true;
+    }
+    if (searchInput) {
+      searchInput.value = "";
+    }
+  }
+
+  function resolveSearch() {
+    if (!searchInput) {
+      return;
+    }
+    const key = searchInput.value.trim().toLowerCase();
+    if (!key) {
+      return;
+    }
+    const playerId = idByName.get(key);
+    if (playerId !== undefined) {
+      selectPlayer(playerId);
+    }
+  }
+
+  function indexPlayers(players) {
+    players.forEach((player) => {
+      playerById.set(player.player_id, player);
+      const name = (player.player_name || "").trim().toLowerCase();
+      if (name && !idByName.has(name)) {
+        idByName.set(name, player.player_id);
+      }
+    });
+    if (datalistEl) {
+      const fragment = document.createDocumentFragment();
+      players.forEach((player) => {
+        if (!player.player_name) {
+          return;
+        }
+        const option = document.createElement("option");
+        option.value = player.player_name;
+        fragment.appendChild(option);
+      });
+      datalistEl.innerHTML = "";
+      datalistEl.appendChild(fragment);
+    }
+  }
+
+  function wireControls() {
+    if (searchForm) {
+      searchForm.addEventListener("submit", (event) => {
+        event.preventDefault();
+        resolveSearch();
+      });
+    }
+    if (searchInput) {
+      searchInput.addEventListener("change", resolveSearch);
+    }
+    if (clearBtn) {
+      clearBtn.addEventListener("click", clearSelection);
+    }
   }
 
   function render(data) {
@@ -148,8 +415,10 @@
       return;
     }
 
+    indexPlayers(players);
     const archetypes = data.archetypes || [];
     const traces = buildTraces(players, archetypes);
+    baseTraceCount = traces.length;
 
     const layout = {
       paper_bgcolor: AXIS_BG,
@@ -177,18 +446,18 @@
       if (!event || !event.points || !event.points.length) {
         return;
       }
-      const playerId = event.points[0].customdata;
-      if (playerId) {
-        window.location.href = "/players/" + playerId;
+      const point = event.points[0];
+      // Ignore clicks on the overlay (edge/highlight) traces.
+      if (point.curveNumber >= baseTraceCount) {
+        return;
+      }
+      if (point.customdata) {
+        selectPlayer(point.customdata);
       }
     });
 
-    setMeta(
-      players.length + " players · " + archetypes.length + " archetypes",
-    );
-    if (noteEl) {
-      noteEl.title = "Click a player to open their detail page.";
-    }
+    wireControls();
+    setMeta(players.length + " players · " + archetypes.length + " archetypes");
   }
 
   function init() {

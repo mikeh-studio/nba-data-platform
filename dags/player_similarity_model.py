@@ -20,6 +20,14 @@ KMEANS_N_INIT = 10
 FEATURE_SCALER = "standard"
 MODEL_VECTOR_NORMALIZATION = "l2_equal_weight"
 
+# 3D map projection. PCA is deterministic and reproducible across pipeline runs
+# (unlike t-SNE/UMAP), so the published coordinates are stable. The projection
+# is an approximate map for navigation; the cosine similarity score stays the
+# source of truth for "how similar".
+PROJECTION_METHOD = "pca"
+PROJECTION_COMPONENTS = 3
+PROJECTION_COLUMNS: Tuple[str, ...] = ("proj_x", "proj_y", "proj_z")
+
 
 @dataclass(frozen=True)
 class SimilarityFeatureSpec:
@@ -453,6 +461,36 @@ def _candidate_cluster_counts(
     return [effective] if effective else []
 
 
+def _project_similarity_vectors(
+    model_values: Any,
+    *,
+    random_state: int = RANDOM_STATE,
+) -> Tuple[Any, List[float]]:
+    """Project the L2-normalized similarity vectors to 3D with PCA.
+
+    The projection runs on the same vectors the served cosine similarity uses,
+    so spatial proximity on the map tracks the similarity metric. When there are
+    fewer samples or features than requested components (small backfills, tests),
+    the remaining coordinate columns are padded with zeros so the output shape is
+    stable. Coordinates are an approximate map only.
+    """
+    import numpy as np
+    from sklearn.decomposition import PCA
+
+    n_samples, n_features = model_values.shape
+    coords = np.zeros((n_samples, PROJECTION_COMPONENTS), dtype=float)
+    variance: List[float] = [0.0] * PROJECTION_COMPONENTS
+    components = min(PROJECTION_COMPONENTS, n_samples, n_features)
+    if components < 1:
+        return coords, variance
+
+    pca = PCA(n_components=components, svd_solver="full", random_state=random_state)
+    coords[:, :components] = pca.fit_transform(model_values)
+    for index in range(components):
+        variance[index] = round(float(pca.explained_variance_ratio_[index]), 4)
+    return np.round(coords, 5), variance
+
+
 def train_player_similarity_model(
     feature_df: pd.DataFrame,
     *,
@@ -508,6 +546,10 @@ def train_player_similarity_model(
         for index, feature_name in enumerate(SIMILARITY_FEATURE_COLUMNS)
     }
     modeling = modeling.assign(**normalized_columns)
+
+    projection_coords, projection_variance = _project_similarity_vectors(model_values)
+    for index, column in enumerate(PROJECTION_COLUMNS):
+        modeling[column] = projection_coords[:, index]
 
     cluster_summaries: Dict[int, Dict[str, Any]] = {}
     for cluster_index in sorted(modeling["cluster_index"].unique()):
@@ -591,6 +633,7 @@ def train_player_similarity_model(
             "archetype_summary",
             *SIMILARITY_FEATURE_COLUMNS,
             *[f"norm_{feature_name}" for feature_name in SIMILARITY_FEATURE_COLUMNS],
+            *PROJECTION_COLUMNS,
         ]
     ].copy()
 
@@ -624,6 +667,9 @@ def train_player_similarity_model(
         "feature_weighting": "equal",
         "feature_scaler": FEATURE_SCALER,
         "vector_normalization": MODEL_VECTOR_NORMALIZATION,
+        "projection_method": PROJECTION_METHOD,
+        "projection_components": int(min(PROJECTION_COMPONENTS, len(modeling))),
+        "projection_explained_variance": projection_variance,
         "empty_imputed_features": empty_columns,
         "cluster_counts": {
             str(cluster_index): int(count)

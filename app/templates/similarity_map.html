@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+  <section class="hero">
+    <div class="hero-top">
+      <div>
+        <div class="eyebrow">Similarity Map</div>
+        <h1>Player Similarity Map</h1>
+      </div>
+      <div class="hero-actions">
+        {% if health.status == "stale" %}
+          <span class="status" title="{{ health.last_successful_finished_at_utc or '' }}">Last refresh {{ health.last_successful_finished_at_utc | time_ago }}</span>
+        {% elif health.status == "fresh" %}
+          <span class="status">Data fresh</span>
+        {% endif %}
+      </div>
+    </div>
+    <p class="subhead">
+      Every qualified player for {{ season }}, projected from their full
+      similarity profile into 3D. Players who sit close together play alike;
+      colors are model archetypes. Drag to rotate, scroll to zoom, click a
+      legend entry to toggle an archetype.
+    </p>
+  </section>
+
+  <div class="stack">
+    <div class="card">
+      <div class="card-header">
+        <h2>Archetype space</h2>
+        <span class="meta" id="map-meta">Loading projection…</span>
+      </div>
+      <div id="similarity-plot" class="similarity-plot" role="img"
+           aria-label="3D scatter plot of players projected by similarity profile"></div>
+      <p class="meta similarity-note" id="map-note">
+        Positions are a PCA projection and are approximate — use them to explore
+        neighborhoods, not to read exact distances. The precise similarity score
+        for any player lives on their detail page.
+      </p>
+    </div>
+  </div>
+
+  <style>
+    .similarity-plot {
+      width: 100%;
+      height: 640px;
+      min-height: 420px;
+    }
+    .similarity-note {
+      margin-top: 12px;
+    }
+    .similarity-empty {
+      padding: 48px 16px;
+      text-align: center;
+    }
+  </style>
+
+  <script src="https://cdn.plot.ly/plotly-gl3d-2.35.2.min.js" charset="utf-8"></script>
+  <script src="/static/similarity_map.js"></script>
+{% endblock %}

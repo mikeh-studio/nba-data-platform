@@ -1154,6 +1154,8 @@ class WarehouseRepository(Protocol):
         self, player_id: int, metric: str, min_games: int = 5
     ) -> dict[str, Any] | None: ...
 
+    def get_similarity_map(self) -> dict[str, Any]: ...
+
     def get_health(self) -> dict[str, Any]: ...
 
 
@@ -2337,6 +2339,81 @@ class BigQueryWarehouseRepository:
             "rankings": rankings,
             "trends": trends,
             "opportunity": opportunity,
+        }
+
+    def _decorate_similarity_map_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "player_id": _to_int(row.get("player_id")),
+            "player_name": row.get("player_name"),
+            "team_abbr": row.get("team_abbr"),
+            "archetype_id": row.get("archetype_id"),
+            "archetype_label": row.get("archetype_label") or "Unclassified",
+            "cluster_confidence": _to_float(row.get("cluster_confidence")),
+            "top_traits": _split_display_list(row.get("top_traits")),
+            "games_sampled": _to_int(row.get("games_sampled")),
+            "sample_status": row.get("sample_status"),
+            "x": _to_float(row.get("proj_x")),
+            "y": _to_float(row.get("proj_y")),
+            "z": _to_float(row.get("proj_z")),
+        }
+
+    @staticmethod
+    def _summarize_map_archetypes(
+        players: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        counts: dict[str, int] = {}
+        for player in players:
+            label = player.get("archetype_label") or "Unclassified"
+            counts[label] = counts.get(label, 0) + 1
+        return [
+            {"archetype_label": label, "count": count}
+            for label, count in sorted(
+                counts.items(), key=lambda item: (-item[1], item[0])
+            )
+        ]
+
+    def get_similarity_map(self) -> dict[str, Any]:
+        """Read the precomputed 3D similarity projection for the season.
+
+        Coordinates are a PCA map of the same vectors the cosine similarity
+        uses; they are approximate. The per-player similarity score remains the
+        source of truth and is surfaced on the player detail page.
+        """
+        sql = f"""
+        SELECT
+          player_id,
+          player_name,
+          team_abbr,
+          archetype_id,
+          archetype_label,
+          cluster_confidence,
+          top_traits,
+          games_sampled,
+          sample_status,
+          proj_x,
+          proj_y,
+          proj_z
+        FROM {self._similarity_feature_table()}
+        WHERE season = @season
+          AND sample_status IN ('ready', 'limited_sample')
+          AND proj_x IS NOT NULL
+          AND proj_y IS NOT NULL
+          AND proj_z IS NOT NULL
+        ORDER BY archetype_label, player_name
+        """
+        try:
+            rows = self._query(
+                sql,
+                [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)],
+            )
+        except BQAPIError:
+            return {"season": SUPPORTED_SEASON, "players": [], "archetypes": []}
+
+        players = [self._decorate_similarity_map_row(row) for row in rows]
+        return {
+            "season": SUPPORTED_SEASON,
+            "players": players,
+            "archetypes": self._summarize_map_archetypes(players),
         }
 
     def get_leaderboard(self, limit: int = 10) -> list[dict[str, Any]]:

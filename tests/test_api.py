@@ -990,6 +990,28 @@ class FakeRepository(WarehouseRepository):
     def get_latest_successful_run(self) -> dict | None:
         return {"season": "2025-26", "finished_at_utc": "2026-02-11T01:15:00+00:00"}
 
+    def get_similarity_map(self) -> dict:
+        return {
+            "season": "2025-26",
+            "players": [
+                {
+                    "player_id": 1,
+                    "player_name": "Alpha Guard",
+                    "team_abbr": "AAA",
+                    "archetype_id": "cluster_0",
+                    "archetype_label": "Scoring Guard",
+                    "cluster_confidence": 0.82,
+                    "top_traits": ["scoring volume", "true shooting"],
+                    "games_sampled": 20,
+                    "sample_status": "ready",
+                    "x": 0.12,
+                    "y": -0.34,
+                    "z": 0.05,
+                }
+            ],
+            "archetypes": [{"archetype_label": "Scoring Guard", "count": 1}],
+        }
+
     def get_health(self) -> dict:
         return {
             "season": "2025-26",
@@ -1669,3 +1691,25 @@ def test_visualize_page_with_player_id() -> None:
     assert response.status_code == 200
     assert "Player Stats Explorer" in response.text
     assert "__vizBootstrap" in response.text
+
+
+def test_api_similarity_map_returns_players_and_archetypes() -> None:
+    client = build_client()
+    response = client.get("/api/similarity-map")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["season"] == "2025-26"
+    assert payload["players"][0]["player_name"] == "Alpha Guard"
+    assert payload["players"][0]["x"] == 0.12
+    assert payload["archetypes"] == [{"archetype_label": "Scoring Guard", "count": 1}]
+
+
+def test_similarity_map_page_smoke() -> None:
+    client = build_client()
+    response = client.get("/similarity-map")
+
+    assert response.status_code == 200
+    assert "Player Similarity Map" in response.text
+    assert "/static/similarity_map.js" in response.text
+    assert "plotly-gl3d" in response.text

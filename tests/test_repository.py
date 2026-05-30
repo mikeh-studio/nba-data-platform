@@ -763,3 +763,64 @@ def test_get_player_metric_percentile_rejects_unknown_metric() -> None:
 
     with pytest.raises(ValueError):
         repo.get_player_metric_percentile(2544, "unsafe_metric")
+
+
+def test_get_similarity_map_decorates_rows_and_summarizes(monkeypatch) -> None:
+    repo = _build_repository()
+
+    def fake_query(sql, *_args, **_kwargs):
+        assert "proj_x" in sql
+        assert "sample_status IN ('ready', 'limited_sample')" in sql
+        return [
+            {
+                "player_id": 1,
+                "player_name": "Alpha",
+                "team_abbr": "AAA",
+                "archetype_id": "cluster_0",
+                "archetype_label": "Scoring Guard",
+                "cluster_confidence": 0.8,
+                "top_traits": "scoring, shooting",
+                "games_sampled": 20,
+                "sample_status": "ready",
+                "proj_x": 0.1,
+                "proj_y": 0.2,
+                "proj_z": 0.3,
+            },
+            {
+                "player_id": 2,
+                "player_name": "Bravo",
+                "team_abbr": "BBB",
+                "archetype_id": "cluster_1",
+                "archetype_label": "Scoring Guard",
+                "cluster_confidence": 0.5,
+                "top_traits": "",
+                "games_sampled": 10,
+                "sample_status": "limited_sample",
+                "proj_x": -0.4,
+                "proj_y": 0.0,
+                "proj_z": 0.1,
+            },
+        ]
+
+    monkeypatch.setattr(repo, "_query", fake_query)
+    result = repo.get_similarity_map()
+
+    assert len(result["players"]) == 2
+    first = result["players"][0]
+    assert first["player_id"] == 1
+    assert (first["x"], first["y"], first["z"]) == (0.1, 0.2, 0.3)
+    assert first["top_traits"] == ["scoring", "shooting"]
+    assert result["archetypes"] == [{"archetype_label": "Scoring Guard", "count": 2}]
+
+
+def test_get_similarity_map_returns_empty_on_bigquery_error(monkeypatch) -> None:
+    repo = _build_repository()
+
+    def fake_query(*_args, **_kwargs):
+        raise BadRequest("boom")
+
+    monkeypatch.setattr(repo, "_query", fake_query)
+    result = repo.get_similarity_map()
+
+    assert result["players"] == []
+    assert result["archetypes"] == []

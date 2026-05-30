@@ -69,8 +69,13 @@ The baseline path:
 5. Applies standard scaling.
 6. L2-normalizes equal-weight vectors.
 7. Trains deterministic KMeans with the configured cluster count.
-8. Publishes normalized feature vectors, archetype labels, confidence, top
-   traits, and table diagnostics.
+8. Projects the L2-normalized vectors to 3D with PCA (`proj_x/proj_y/proj_z`)
+   for the similarity map. PCA is used instead of t-SNE/UMAP so the published
+   coordinates are deterministic and reproducible across runs. The projection
+   is an approximate map only; the cosine similarity score remains the source
+   of truth, and explained variance is reported in diagnostics.
+9. Publishes normalized feature vectors, projection coordinates, archetype
+   labels, confidence, top traits, and table diagnostics.
 
 This baseline deliberately does not publish tuned feature weights, detailed
 thresholds, experimental scoring rules, or model-selection heuristics.
@@ -79,7 +84,9 @@ thresholds, experimental scoring rules, or model-selection heuristics.
 
 `write_player_similarity_tables` deletes and rewrites the seasons included in
 the model output. The feature table load allows additive schema changes so new
-`norm_*` fields can be published without dropping the existing table.
+`norm_*` and `proj_*` fields can be published without dropping the existing
+table. The 3D projection is served read-only at `/similarity-map` (Plotly
+`scatter3d`) and `/api/similarity-map`.
 
 ## Validation
 

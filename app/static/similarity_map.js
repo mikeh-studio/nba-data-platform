@@ -241,7 +241,8 @@
     const nx = [];
     const ny = [];
     const nz = [];
-    const nText = [];
+    const nNames = [];
+    const nHover = [];
 
     (payload.neighbors || []).forEach((neighbor) => {
       const match = playerById.get(neighbor.player_id);
@@ -254,7 +255,8 @@
       nx.push(match.x);
       ny.push(match.y);
       nz.push(match.z);
-      nText.push(
+      nNames.push(neighbor.player_name || "Unknown");
+      nHover.push(
         "<b>" +
           (neighbor.player_name || "Unknown") +
           "</b><br>Similarity " +
@@ -275,12 +277,15 @@
     };
     const neighborTrace = {
       type: "scatter3d",
-      mode: "markers",
+      mode: "markers+text",
       x: nx,
       y: ny,
       z: nz,
-      text: nText,
-      hovertemplate: "%{text}<extra></extra>",
+      text: nNames,
+      textposition: "top center",
+      textfont: { color: FONT_COLOR, size: 10 },
+      hovertext: nHover,
+      hovertemplate: "%{hovertext}<extra></extra>",
       marker: {
         size: 7,
         color: EDGE_COLOR,
@@ -288,14 +293,18 @@
       },
       showlegend: false,
     };
+    const anchorName = anchor.player_name || "Player";
     const anchorTrace = {
       type: "scatter3d",
-      mode: "markers",
+      mode: "markers+text",
       x: [anchor.x],
       y: [anchor.y],
       z: [anchor.z],
-      text: ["<b>" + (anchor.player_name || "Player") + "</b>"],
-      hovertemplate: "%{text}<extra></extra>",
+      text: [anchorName],
+      textposition: "top center",
+      textfont: { color: ANCHOR_COLOR, size: 12 },
+      hovertext: ["<b>" + anchorName + "</b>"],
+      hovertemplate: "%{hovertext}<extra></extra>",
       marker: {
         size: 12,
         color: ANCHOR_COLOR,

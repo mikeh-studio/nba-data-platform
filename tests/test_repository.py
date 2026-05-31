@@ -777,7 +777,7 @@ def test_get_similarity_map_decorates_rows_and_summarizes(monkeypatch) -> None:
                 "player_name": "Alpha",
                 "team_abbr": "AAA",
                 "archetype_id": "cluster_0",
-                "archetype_label": "Scoring Guard",
+                "archetype_label": "Scoring Guard - Scoring Volume / Recent Scoring",
                 "cluster_confidence": 0.8,
                 "top_traits": "scoring, shooting",
                 "games_sampled": 20,
@@ -791,7 +791,7 @@ def test_get_similarity_map_decorates_rows_and_summarizes(monkeypatch) -> None:
                 "player_name": "Bravo",
                 "team_abbr": "BBB",
                 "archetype_id": "cluster_1",
-                "archetype_label": "Scoring Guard",
+                "archetype_label": "Scoring Guard - Shot Volume / Three-Point Diet",
                 "cluster_confidence": 0.5,
                 "top_traits": "",
                 "games_sampled": 10,
@@ -810,6 +810,9 @@ def test_get_similarity_map_decorates_rows_and_summarizes(monkeypatch) -> None:
     assert first["player_id"] == 1
     assert (first["x"], first["y"], first["z"]) == (0.1, 0.2, 0.3)
     assert first["top_traits"] == ["scoring", "shooting"]
+    # Per-player rows keep the granular label...
+    assert first["archetype_label"] == "Scoring Guard - Scoring Volume / Recent Scoring"
+    # ...but the summary collapses both to the base archetype family.
     assert result["archetypes"] == [{"archetype_label": "Scoring Guard", "count": 2}]
 
 

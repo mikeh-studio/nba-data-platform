@@ -2362,12 +2362,20 @@ class BigQueryWarehouseRepository:
         }
 
     @staticmethod
+    def _base_archetype_label(label: str | None) -> str:
+        # archetype_label is per-player and granular (e.g. "Scoring Guard -
+        # Scoring Volume / Recent Scoring"). The family before the first " - "
+        # is what the map colors by, so summarize at that level.
+        text = (label or "Unclassified").split(" - ", 1)[0].strip()
+        return text or "Unclassified"
+
+    @classmethod
     def _summarize_map_archetypes(
-        players: list[dict[str, Any]],
+        cls, players: list[dict[str, Any]]
     ) -> list[dict[str, Any]]:
         counts: dict[str, int] = {}
         for player in players:
-            label = player.get("archetype_label") or "Unclassified"
+            label = cls._base_archetype_label(player.get("archetype_label"))
             counts[label] = counts.get(label, 0) + 1
         return [
             {"archetype_label": label, "count": count}

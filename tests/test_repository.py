@@ -778,8 +778,10 @@ def test_get_similarity_map_decorates_rows_and_summarizes(monkeypatch) -> None:
     )
 
     def fake_query(sql, *_args, **_kwargs):
+        # Axis metadata is fetched in a separate, guarded query.
+        if "projection_axes" in sql and "proj_x" not in sql:
+            return [{"projection_axes": axes_json}]
         assert "proj_x" in sql
-        assert "projection_axes" in sql
         assert "sample_status IN ('ready', 'limited_sample')" in sql
         return [
             {
@@ -795,7 +797,6 @@ def test_get_similarity_map_decorates_rows_and_summarizes(monkeypatch) -> None:
                 "proj_x": 0.1,
                 "proj_y": 0.2,
                 "proj_z": 0.3,
-                "projection_axes": axes_json,
             },
             {
                 "player_id": 2,
@@ -829,6 +830,38 @@ def test_get_similarity_map_decorates_rows_and_summarizes(monkeypatch) -> None:
     assert [axis["key"] for axis in result["axes"]] == ["proj_x", "proj_y", "proj_z"]
     assert result["axes"][0]["variance"] == 0.28
     assert result["axes"][0]["drivers"] == ["scoring volume", "usage"]
+
+
+def test_get_similarity_map_loads_players_when_axes_column_missing(monkeypatch) -> None:
+    repo = _build_repository()
+
+    def fake_query(sql, *_args, **_kwargs):
+        # Simulate a table published before the projection_axes column existed.
+        if "projection_axes" in sql:
+            raise BadRequest("Unrecognized name: projection_axes")
+        return [
+            {
+                "player_id": 1,
+                "player_name": "Alpha",
+                "team_abbr": "AAA",
+                "archetype_id": "cluster_0",
+                "archetype_label": "Scoring Guard",
+                "cluster_confidence": 0.8,
+                "top_traits": "scoring",
+                "games_sampled": 20,
+                "sample_status": "ready",
+                "proj_x": 0.1,
+                "proj_y": 0.2,
+                "proj_z": 0.3,
+            }
+        ]
+
+    monkeypatch.setattr(repo, "_query", fake_query)
+    result = repo.get_similarity_map()
+
+    # Players still load; only the axis annotations degrade to empty.
+    assert len(result["players"]) == 1
+    assert result["axes"] == []
 
 
 def test_get_similarity_map_returns_empty_on_bigquery_error(monkeypatch) -> None:

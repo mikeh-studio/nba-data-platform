@@ -2429,8 +2429,7 @@ class BigQueryWarehouseRepository:
           sample_status,
           proj_x,
           proj_y,
-          proj_z,
-          projection_axes
+          proj_z
         FROM {self._similarity_feature_table()}
         WHERE season = @season
           AND sample_status IN ('ready', 'limited_sample')
@@ -2453,15 +2452,37 @@ class BigQueryWarehouseRepository:
             }
 
         players = [self._decorate_similarity_map_row(row) for row in rows]
-        axes = (
-            self._parse_projection_axes(rows[0].get("projection_axes")) if rows else []
-        )
         return {
             "season": SUPPORTED_SEASON,
             "players": players,
             "archetypes": self._summarize_map_archetypes(players),
-            "axes": axes,
+            "axes": self._fetch_projection_axes(),
         }
+
+    def _fetch_projection_axes(self) -> list[dict[str, Any]]:
+        """Read the projection axis annotations, if the column is present.
+
+        Kept as a separate, guarded query so the map still loads players when
+        the projection_axes column has not been published yet (e.g. before the
+        first projection-aware pipeline run / backfill).
+        """
+        sql = f"""
+        SELECT projection_axes
+        FROM {self._similarity_feature_table()}
+        WHERE season = @season
+          AND projection_axes IS NOT NULL
+        LIMIT 1
+        """
+        try:
+            rows = self._query(
+                sql,
+                [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)],
+            )
+        except BQAPIError:
+            return []
+        if not rows:
+            return []
+        return self._parse_projection_axes(rows[0].get("projection_axes"))
 
     def get_similarity_neighbors(
         self, player_id: int, *, limit: int = SIMILARITY_RESULT_LIMIT

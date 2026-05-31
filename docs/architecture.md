@@ -91,7 +91,8 @@ Agent serving models:
 Similarity outputs:
 
 - `player_similarity_feature_input`
-- `player_similarity_features`
+- `player_similarity_features` (also carries the 3D map projection `proj_x/y/z`
+  and per-axis driver metadata `projection_axes`)
 - `player_archetypes`
 
 The public baseline and publish contract are documented in

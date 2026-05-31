@@ -10,6 +10,7 @@ same process.
 - `/compare`
 - `/visualize`
 - `/performance`
+- `/similarity-map`
 - `/ask`
 
 ## JSON Routes
@@ -26,6 +27,8 @@ same process.
 - `/api/performance/games`
 - `/api/performance/players`
 - `/api/performance/players/{player_id}`
+- `/api/similarity-map`
+- `/api/similarity-map/neighbors/{player_id}`
 - `/api/agent/ask`
 - `/api/health`
 

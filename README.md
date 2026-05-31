@@ -72,7 +72,14 @@ The FastAPI service serves both HTML pages and JSON routes:
 
 - home dashboard, player pages, performance, compare, visualize, similarity map, and ask pages
 - leaderboard, trends, recent game performance, analysis snapshot, recommendations, rankings
-- player search/detail, game logs, percentiles, similarity, similarity map (3D PCA projection), and health
+- player search/detail, game logs, percentiles, similarity, and health
+
+The similarity map (`/similarity-map`) is a 3D PCA projection of the player
+similarity vectors: players cluster by archetype, selecting one traces edges to
+its true cosine-nearest matches, and each axis is labeled with the features that
+drive it.
+
+![Player similarity map](docs/images/similarity-map.png)
 
 The service is public read-only for v1. It reads from curated gold, agent, and
 metadata tables; it does not expose arbitrary SQL access.

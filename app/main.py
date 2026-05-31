@@ -405,6 +405,37 @@ def performance_page(
     return templates.TemplateResponse(request, "performance.html", context)
 
 
+@app.get("/api/similarity-map")
+def api_similarity_map(
+    repo: Annotated[WarehouseRepository, Depends(get_repository)],
+) -> dict:
+    return repo.get_similarity_map()
+
+
+@app.get("/api/similarity-map/neighbors/{player_id}")
+def api_similarity_map_neighbors(
+    player_id: int,
+    repo: Annotated[WarehouseRepository, Depends(get_repository)],
+    limit: int = Query(default=8, ge=1, le=15),
+) -> dict:
+    return repo.get_similarity_neighbors(player_id, limit=limit)
+
+
+@app.get("/similarity-map", response_class=HTMLResponse)
+def similarity_map_page(
+    request: Request,
+    repo: Annotated[WarehouseRepository, Depends(get_repository)],
+) -> HTMLResponse:
+    health = repo.get_health()
+    context = {
+        "request": request,
+        "page_title": "Player Similarity Map",
+        "season": SUPPORTED_SEASON,
+        "health": health,
+    }
+    return templates.TemplateResponse(request, "similarity_map.html", context)
+
+
 @app.get("/compare", response_class=HTMLResponse)
 def compare_page(
     request: Request,

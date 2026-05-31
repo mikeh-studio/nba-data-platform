@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -763,3 +764,158 @@ def test_get_player_metric_percentile_rejects_unknown_metric() -> None:
 
     with pytest.raises(ValueError):
         repo.get_player_metric_percentile(2544, "unsafe_metric")
+
+
+def test_get_similarity_map_decorates_rows_and_summarizes(monkeypatch) -> None:
+    repo = _build_repository()
+
+    axes_json = json.dumps(
+        [
+            {"key": "proj_x", "variance": 0.28, "drivers": ["scoring volume", "usage"]},
+            {"key": "proj_y", "variance": 0.19, "drivers": ["rim protection"]},
+            {"key": "proj_z", "variance": 0.11, "drivers": ["playmaking"]},
+        ]
+    )
+
+    def fake_query(sql, *_args, **_kwargs):
+        # Axis metadata is fetched in a separate, guarded query.
+        if "projection_axes" in sql and "proj_x" not in sql:
+            return [{"projection_axes": axes_json}]
+        assert "proj_x" in sql
+        assert "sample_status IN ('ready', 'limited_sample')" in sql
+        return [
+            {
+                "player_id": 1,
+                "player_name": "Alpha",
+                "team_abbr": "AAA",
+                "archetype_id": "cluster_0",
+                "archetype_label": "Scoring Guard - Scoring Volume / Recent Scoring",
+                "cluster_confidence": 0.8,
+                "top_traits": "scoring, shooting",
+                "games_sampled": 20,
+                "sample_status": "ready",
+                "proj_x": 0.1,
+                "proj_y": 0.2,
+                "proj_z": 0.3,
+            },
+            {
+                "player_id": 2,
+                "player_name": "Bravo",
+                "team_abbr": "BBB",
+                "archetype_id": "cluster_1",
+                "archetype_label": "Scoring Guard - Shot Volume / Three-Point Diet",
+                "cluster_confidence": 0.5,
+                "top_traits": "",
+                "games_sampled": 10,
+                "sample_status": "limited_sample",
+                "proj_x": -0.4,
+                "proj_y": 0.0,
+                "proj_z": 0.1,
+            },
+        ]
+
+    monkeypatch.setattr(repo, "_query", fake_query)
+    result = repo.get_similarity_map()
+
+    assert len(result["players"]) == 2
+    first = result["players"][0]
+    assert first["player_id"] == 1
+    assert (first["x"], first["y"], first["z"]) == (0.1, 0.2, 0.3)
+    assert first["top_traits"] == ["scoring", "shooting"]
+    # Per-player rows keep the granular label...
+    assert first["archetype_label"] == "Scoring Guard - Scoring Volume / Recent Scoring"
+    # ...but the summary collapses both to the base archetype family.
+    assert result["archetypes"] == [{"archetype_label": "Scoring Guard", "count": 2}]
+    # Axis metadata is parsed from the projection_axes JSON.
+    assert [axis["key"] for axis in result["axes"]] == ["proj_x", "proj_y", "proj_z"]
+    assert result["axes"][0]["variance"] == 0.28
+    assert result["axes"][0]["drivers"] == ["scoring volume", "usage"]
+
+
+def test_get_similarity_map_loads_players_when_axes_column_missing(monkeypatch) -> None:
+    repo = _build_repository()
+
+    def fake_query(sql, *_args, **_kwargs):
+        # Simulate a table published before the projection_axes column existed.
+        if "projection_axes" in sql:
+            raise BadRequest("Unrecognized name: projection_axes")
+        return [
+            {
+                "player_id": 1,
+                "player_name": "Alpha",
+                "team_abbr": "AAA",
+                "archetype_id": "cluster_0",
+                "archetype_label": "Scoring Guard",
+                "cluster_confidence": 0.8,
+                "top_traits": "scoring",
+                "games_sampled": 20,
+                "sample_status": "ready",
+                "proj_x": 0.1,
+                "proj_y": 0.2,
+                "proj_z": 0.3,
+            }
+        ]
+
+    monkeypatch.setattr(repo, "_query", fake_query)
+    result = repo.get_similarity_map()
+
+    # Players still load; only the axis annotations degrade to empty.
+    assert len(result["players"]) == 1
+    assert result["axes"] == []
+
+
+def test_get_similarity_map_returns_empty_on_bigquery_error(monkeypatch) -> None:
+    repo = _build_repository()
+
+    def fake_query(*_args, **_kwargs):
+        raise BadRequest("boom")
+
+    monkeypatch.setattr(repo, "_query", fake_query)
+    result = repo.get_similarity_map()
+
+    assert result["players"] == []
+    assert result["archetypes"] == []
+
+
+def test_get_similarity_neighbors_returns_anchor_and_neighbors(monkeypatch) -> None:
+    repo = _build_repository()
+    monkeypatch.setattr(
+        repo, "_fetch_similarity_anchor", lambda pid: {"player_name": "Anchor"}
+    )
+
+    def fake_similar(player_id, *, anchor=None, limit=6):
+        assert anchor == {"player_name": "Anchor"}
+        assert limit == 4
+        return (
+            "fresh",
+            None,
+            [
+                {
+                    "player_id": 2,
+                    "player_name": "Match",
+                    "team_abbr": "BBB",
+                    "archetype_label": "Scoring Guard",
+                    "similarity_score": 0.9,
+                    "shared_traits": ["scoring"],
+                }
+            ],
+        )
+
+    monkeypatch.setattr(repo, "_get_similar_players", fake_similar)
+    result = repo.get_similarity_neighbors(7, limit=4)
+
+    assert result["player_id"] == 7
+    assert result["player_name"] == "Anchor"
+    assert result["state"] == "fresh"
+    assert result["neighbors"][0]["player_id"] == 2
+    assert result["neighbors"][0]["similarity_score"] == 0.9
+
+
+def test_get_similarity_neighbors_unavailable_when_anchor_missing(monkeypatch) -> None:
+    repo = _build_repository()
+    monkeypatch.setattr(repo, "_fetch_similarity_anchor", lambda pid: None)
+
+    result = repo.get_similarity_neighbors(7)
+
+    assert result["state"] == "unavailable"
+    assert result["neighbors"] == []

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -416,3 +417,38 @@ def test_label_cluster_uses_physical_size_as_interior_context():
     )
 
     assert label == "Interior Big"
+
+
+def test_train_player_similarity_model_emits_projection_columns() -> None:
+    result = model.train_player_similarity_model(_training_frame(), cluster_count=3)
+
+    for column in model.PROJECTION_COLUMNS:
+        assert column in result.features.columns
+        assert result.features[column].notna().all()
+
+    assert result.diagnostics["projection_method"] == model.PROJECTION_METHOD
+    variance = result.diagnostics["projection_explained_variance"]
+    assert len(variance) == model.PROJECTION_COMPONENTS
+    assert all(0.0 <= value <= 1.0 for value in variance)
+
+
+def test_train_player_similarity_model_projection_is_deterministic() -> None:
+    first = model.train_player_similarity_model(_training_frame(), cluster_count=3)
+    second = model.train_player_similarity_model(_training_frame(), cluster_count=3)
+
+    columns = list(model.PROJECTION_COLUMNS)
+    assert first.features[columns].equals(second.features[columns])
+
+
+def test_train_player_similarity_model_emits_axis_drivers() -> None:
+    result = model.train_player_similarity_model(_training_frame(), cluster_count=3)
+
+    raw = result.features["projection_axes"].iloc[0]
+    axes = json.loads(raw)
+    assert [axis["key"] for axis in axes] == list(model.PROJECTION_COLUMNS)
+    # Every populated component reports a variance share and human-readable
+    # driving features (mapped from the model's trait labels).
+    assert all(0.0 <= axis["variance"] <= 1.0 for axis in axes)
+    assert axes[0]["drivers"], "first component should have driving features"
+    assert all(isinstance(name, str) for name in axes[0]["drivers"])
+    assert result.diagnostics["projection_axes"] == axes

@@ -69,8 +69,16 @@ The baseline path:
 5. Applies standard scaling.
 6. L2-normalizes equal-weight vectors.
 7. Trains deterministic KMeans with the configured cluster count.
-8. Publishes normalized feature vectors, archetype labels, confidence, top
-   traits, and table diagnostics.
+8. Projects the L2-normalized vectors to 3D with PCA (`proj_x/proj_y/proj_z`)
+   for the similarity map. PCA is used instead of t-SNE/UMAP so the published
+   coordinates are deterministic and reproducible across runs. The projection
+   is an approximate map only; the cosine similarity score remains the source
+   of truth, and explained variance is reported in diagnostics. Each axis also
+   gets its top driving features (from the PCA loadings, mapped to trait
+   labels), published as a `projection_axes` JSON column so the map can label
+   PC1/PC2/PC3 with what actually separates players.
+9. Publishes normalized feature vectors, projection coordinates, archetype
+   labels, confidence, top traits, and table diagnostics.
 
 This baseline deliberately does not publish tuned feature weights, detailed
 thresholds, experimental scoring rules, or model-selection heuristics.
@@ -79,7 +87,22 @@ thresholds, experimental scoring rules, or model-selection heuristics.
 
 `write_player_similarity_tables` deletes and rewrites the seasons included in
 the model output. The feature table load allows additive schema changes so new
-`norm_*` fields can be published without dropping the existing table.
+`norm_*` and `proj_*` fields can be published without dropping the existing
+table. The 3D projection is served read-only at `/similarity-map` (Plotly
+`scatter3d`) and `/api/similarity-map`. Selecting a player calls
+`/api/similarity-map/neighbors/{player_id}`, which returns the player's true
+cosine-nearest matches from the served similarity scoring. The map draws edges
+to those matches by their projected coordinates, so an edge can point to a
+player who sits visually far away — the projection is a map, the cosine score
+is the truth.
+
+To populate `proj_*` immediately (instead of waiting for the next scheduled
+run), recompute and republish with the existing pipeline path:
+
+```bash
+python scripts/backfill_similarity_projection.py          # dry run (read-only)
+python scripts/backfill_similarity_projection.py --write   # publish to BigQuery
+```
 
 ## Validation
 

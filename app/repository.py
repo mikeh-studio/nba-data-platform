@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from math import sqrt
@@ -1153,6 +1154,12 @@ class WarehouseRepository(Protocol):
     def get_player_metric_percentile(
         self, player_id: int, metric: str, min_games: int = 5
     ) -> dict[str, Any] | None: ...
+
+    def get_similarity_map(self) -> dict[str, Any]: ...
+
+    def get_similarity_neighbors(
+        self, player_id: int, *, limit: int = SIMILARITY_RESULT_LIMIT
+    ) -> dict[str, Any]: ...
 
     def get_health(self) -> dict[str, Any]: ...
 
@@ -2337,6 +2344,186 @@ class BigQueryWarehouseRepository:
             "rankings": rankings,
             "trends": trends,
             "opportunity": opportunity,
+        }
+
+    def _decorate_similarity_map_row(self, row: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "player_id": _to_int(row.get("player_id")),
+            "player_name": row.get("player_name"),
+            "team_abbr": row.get("team_abbr"),
+            "archetype_id": row.get("archetype_id"),
+            "archetype_label": row.get("archetype_label") or "Unclassified",
+            "cluster_confidence": _to_float(row.get("cluster_confidence")),
+            "top_traits": _split_display_list(row.get("top_traits")),
+            "games_sampled": _to_int(row.get("games_sampled")),
+            "sample_status": row.get("sample_status"),
+            "x": _to_float(row.get("proj_x")),
+            "y": _to_float(row.get("proj_y")),
+            "z": _to_float(row.get("proj_z")),
+        }
+
+    @staticmethod
+    def _parse_projection_axes(value: Any) -> list[dict[str, Any]]:
+        """Decode the projection_axes JSON (axis variance + driving features)."""
+        if not value:
+            return []
+        try:
+            parsed = json.loads(value) if isinstance(value, str) else value
+        except (TypeError, ValueError):
+            return []
+        if not isinstance(parsed, list):
+            return []
+        axes: list[dict[str, Any]] = []
+        for item in parsed:
+            if not isinstance(item, dict):
+                continue
+            axes.append(
+                {
+                    "key": item.get("key"),
+                    "variance": _to_float(item.get("variance")),
+                    "drivers": [str(d) for d in item.get("drivers", []) if d],
+                }
+            )
+        return axes
+
+    @staticmethod
+    def _base_archetype_label(label: str | None) -> str:
+        # archetype_label is per-player and granular (e.g. "Scoring Guard -
+        # Scoring Volume / Recent Scoring"). The family before the first " - "
+        # is what the map colors by, so summarize at that level.
+        text = (label or "Unclassified").split(" - ", 1)[0].strip()
+        return text or "Unclassified"
+
+    @classmethod
+    def _summarize_map_archetypes(
+        cls, players: list[dict[str, Any]]
+    ) -> list[dict[str, Any]]:
+        counts: dict[str, int] = {}
+        for player in players:
+            label = cls._base_archetype_label(player.get("archetype_label"))
+            counts[label] = counts.get(label, 0) + 1
+        return [
+            {"archetype_label": label, "count": count}
+            for label, count in sorted(
+                counts.items(), key=lambda item: (-item[1], item[0])
+            )
+        ]
+
+    def get_similarity_map(self) -> dict[str, Any]:
+        """Read the precomputed 3D similarity projection for the season.
+
+        Coordinates are a PCA map of the same vectors the cosine similarity
+        uses; they are approximate. The per-player similarity score remains the
+        source of truth and is surfaced on the player detail page.
+        """
+        sql = f"""
+        SELECT
+          player_id,
+          player_name,
+          team_abbr,
+          archetype_id,
+          archetype_label,
+          cluster_confidence,
+          top_traits,
+          games_sampled,
+          sample_status,
+          proj_x,
+          proj_y,
+          proj_z
+        FROM {self._similarity_feature_table()}
+        WHERE season = @season
+          AND sample_status IN ('ready', 'limited_sample')
+          AND proj_x IS NOT NULL
+          AND proj_y IS NOT NULL
+          AND proj_z IS NOT NULL
+        ORDER BY archetype_label, player_name
+        """
+        try:
+            rows = self._query(
+                sql,
+                [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)],
+            )
+        except BQAPIError:
+            return {
+                "season": SUPPORTED_SEASON,
+                "players": [],
+                "archetypes": [],
+                "axes": [],
+            }
+
+        players = [self._decorate_similarity_map_row(row) for row in rows]
+        return {
+            "season": SUPPORTED_SEASON,
+            "players": players,
+            "archetypes": self._summarize_map_archetypes(players),
+            "axes": self._fetch_projection_axes(),
+        }
+
+    def _fetch_projection_axes(self) -> list[dict[str, Any]]:
+        """Read the projection axis annotations, if the column is present.
+
+        Kept as a separate, guarded query so the map still loads players when
+        the projection_axes column has not been published yet (e.g. before the
+        first projection-aware pipeline run / backfill).
+        """
+        sql = f"""
+        SELECT projection_axes
+        FROM {self._similarity_feature_table()}
+        WHERE season = @season
+          AND projection_axes IS NOT NULL
+        LIMIT 1
+        """
+        try:
+            rows = self._query(
+                sql,
+                [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)],
+            )
+        except BQAPIError:
+            return []
+        if not rows:
+            return []
+        return self._parse_projection_axes(rows[0].get("projection_axes"))
+
+    def get_similarity_neighbors(
+        self, player_id: int, *, limit: int = SIMILARITY_RESULT_LIMIT
+    ) -> dict[str, Any]:
+        """Return a player's true cosine-nearest neighbors for the map.
+
+        These come from the served similarity scoring (distance on the
+        normalized vectors), not from 3D proximity — so an edge can point to a
+        player who sits visually far on the projection. That divergence is the
+        honest signal the map is meant to surface.
+        """
+        anchor = self._fetch_similarity_anchor(player_id)
+        if anchor is None:
+            return {
+                "state": STATE_UNAVAILABLE,
+                "reason": "Similarity profile is unavailable.",
+                "player_id": player_id,
+                "player_name": None,
+                "neighbors": [],
+            }
+
+        state, reason, items = self._get_similar_players(
+            player_id, anchor=anchor, limit=limit
+        )
+        neighbors = [
+            {
+                "player_id": item.get("player_id"),
+                "player_name": item.get("player_name"),
+                "team_abbr": item.get("team_abbr"),
+                "archetype_label": item.get("archetype_label"),
+                "similarity_score": item.get("similarity_score"),
+                "shared_traits": item.get("shared_traits", []),
+            }
+            for item in items
+        ]
+        return {
+            "state": state,
+            "reason": reason,
+            "player_id": player_id,
+            "player_name": anchor.get("player_name"),
+            "neighbors": neighbors,
         }
 
     def get_leaderboard(self, limit: int = 10) -> list[dict[str, Any]]:

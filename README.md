@@ -1,9 +1,17 @@
 # NBA Stats Desk
 
+[![CI](https://github.com/mikeh-studio/nba-stats-desk/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mikeh-studio/nba-stats-desk/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Agentic, GCP-backed NBA intelligence workbench for the `2025-26` season. It
 pairs a natural-language `/ask` stats agent that can call the OpenAI API or
 Claude API with Performance insights for recent player form, backed by BigQuery,
 dbt, Airflow, and a Cloud Run-ready FastAPI service.
+
+**Platform scope:** 30 dbt SQL models transform six NBA source domains into 16
+gold serving models for a read-only FastAPI workbench and stats agent.
+
+![Ask page](docs/images/ask-page.png)
 
 Core flow:
 
@@ -50,11 +58,12 @@ Optional portfolio paths include Redshift Serverless as a secondary warehouse.
 
 ## Data Domains
 
-The pipeline ingests five source domains:
+The pipeline ingests six source domains:
 
 - player game logs
 - team line scores
 - player reference and roster context
+- player shot locations
 - upcoming schedule context
 - official NBA injury reports
 
@@ -102,8 +111,6 @@ its true cosine-nearest matches, and each axis is labeled with the features that
 drive it. A model selector lets readers compare the KMeans baseline, Gaussian
 mixture, hierarchy, and density-scan groupings without moving the underlying
 player coordinates.
-
-![Ask page](docs/images/ask-page.png)
 
 ![Player trends page](docs/images/player-trends.png)
 

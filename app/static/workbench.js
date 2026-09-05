@@ -168,7 +168,15 @@ export function formatHealthStatusText(payload, format = "default") {
   const coverage = includeCoverage ? formatSeasonCoverage(payload?.season_coverage) : "";
 
   let text = "Data status unavailable";
-  if (includeCoverage && lastRefresh) {
+  if (status === "partially_updated") {
+    text = "Partially updated — check data sources";
+  } else if (status === "offseason") {
+    text = "Offseason — waiting for regular-season games";
+  } else if (status === "awaiting_refresh") {
+    text = "Regular season started — awaiting first refresh";
+  } else if (status === "stale") {
+    text = "Data update overdue";
+  } else if (includeCoverage && lastRefresh) {
     text = `Last refresh ${formatTimeAgo(lastRefresh)}`;
   } else if (status === "fresh") {
     text = "Data fresh";
@@ -177,6 +185,27 @@ export function formatHealthStatusText(payload, format = "default") {
   }
 
   return coverage ? `${text} - ${coverage}` : text;
+}
+
+function formatPublicationDate(value, includeTime = false) {
+  if (!value) return "unknown";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium", timeStyle: includeTime ? "short" : undefined, timeZone: "UTC",
+  }).format(date) + (includeTime ? " UTC" : "");
+}
+
+export function formatAssetHealthText(asset) {
+  const state = {
+    fresh: "Current", stale: "Update overdue", offseason: "Offseason archive",
+    awaiting_refresh: "Awaiting first refresh", missing: "No publication recorded",
+    unavailable: "Status unavailable", refresh_failed: "Refresh failed",
+  }[asset?.status] || "Status unknown";
+  const retained = asset?.serving_previous_version ? " — serving previous version" : "";
+  const published = `Last successful refresh: ${formatPublicationDate(asset?.last_successful_finished_at_utc, true)}`;
+  const source = `Latest source data: ${formatPublicationDate(asset?.latest_source_date)}`;
+  return `${asset?.label || "Data"}: ${state}${retained}. ${published}. ${source}.`;
 }
 
 function formatSeasonCoverageTitle(coverage) {
@@ -226,6 +255,19 @@ async function setupHealthStatus() {
     }
     const payload = await response.json();
     nodes.forEach((node) => renderHealthStatus(node, payload));
+    document.querySelectorAll("[data-publication-health]").forEach((panel) => {
+      const seasonNode = panel.querySelector("[data-health-season]");
+      seasonNode.textContent = payload.season_phase === "offseason"
+        ? `No new data is expected until the regular season starts on ${formatPublicationDate(payload.next_regular_season_start)}. Preseason and Summer League are excluded.`
+        : `Showing season ${payload.season}. Freshness tracks publication time and source data separately.`;
+      const list = panel.querySelector("[data-health-assets]");
+      list.replaceChildren();
+      Object.values(payload.assets || {}).forEach((asset) => {
+        const item = document.createElement("li");
+        item.textContent = formatAssetHealthText(asset);
+        list.appendChild(item);
+      });
+    });
   } catch {
     nodes.forEach((node) => {
       node.classList.toggle("loading", false);

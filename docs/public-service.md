@@ -42,9 +42,34 @@ old Visualize page has been removed.
 The service reads only from gold, agent, and metadata datasets. It is public
 read-only for v1 and does not include auth.
 
-Freshness is reported from the latest successful run in
-`nba_metadata.pipeline_run_log` and evaluated against the configured freshness
-threshold.
+`/api/health` reports stats, injuries, and similarity independently from
+`nba_metadata.pipeline_run_log`. Each asset includes its last successful
+publication time, latest source data date, and last attempted publication status.
+Skipped/no-change runs do not reset publication time or clear a previous failure.
+Historical logs are supported; unavailable historical source dates remain unknown.
+
+An optional asset failure produces `partially_updated` while valid core stats
+remain available. The expandable data-status panel appears on every app page;
+it identifies retained previous versions and their last successful refresh.
+
+Freshness uses an explicit offseason window in `America/New_York`:
+
+- `NBA_FRESHNESS_OFFSEASON_START` defaults to `2026-06-20`, after the last
+  scheduled possible Finals game.
+- `NBA_NEXT_REGULAR_SEASON_START` defaults to `2026-10-20`, the next opening day.
+  Calendar source: [NBA key dates](https://gleague.nba.com/key-dates).
+- During that window, existing data is an `offseason` archive, with
+  `updates_expected=false` and `is_fresh=null`. Actual failed refresh attempts
+  remain visible. Preseason and Summer League do not end the pause.
+- Starting on opening day, `awaiting_refresh` allows the configured freshness
+  threshold (default 36 hours) for the first ingestion. After that, old source
+  data is overdue even if a recent pipeline run completed successfully.
+
+This policy does not change the supported ingestion season or restart the DAG:
+the current DAG still ends on July 1, 2026, and the SQL/app still serve 2025-26.
+Season rollover must update those contracts separately. Refreshing the calendar
+alone cannot make old-season data current. Update the two calendar settings
+from the official schedule when rolling the pipeline forward.
 
 ## Player and Compare Experience
 

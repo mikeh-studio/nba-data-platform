@@ -405,6 +405,13 @@
       .status[data-health-state="unavailable"] {
         color: var(--muted);
       }
+      .publication-health { margin: 0 0 20px; }
+      .publication-health summary { cursor: pointer; width: fit-content; }
+      .publication-health summary::after { content: " ▾"; margin-left: 8px; }
+      .publication-health[open] summary::after { content: " ▴"; }
+      .publication-health ul { padding-left: 20px; font-size: 0.85rem; line-height: 1.7; }
+      .status[data-health-state="partially_updated"],
+      .status[data-health-state="stale"] { color: #ffb790; }
       .chip.improvement {
         border-color: rgba(240, 78, 35, 0.42);
         background: rgba(240, 78, 35, 0.16);
@@ -939,6 +946,11 @@
             <span class="season-tag">Season {{ season }}</span>
           </div>
         </nav>
+        <details class="publication-health" data-publication-health>
+          <summary class="status loading" data-health-status>Checking data status…</summary>
+          <p class="meta" data-health-season></p>
+          <ul data-health-assets></ul>
+        </details>
         {% block content %}{% endblock %}
       </div>
     </main>

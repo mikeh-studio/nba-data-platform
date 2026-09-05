@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import date
 
 from dotenv import load_dotenv
 
@@ -80,6 +81,8 @@ class Settings:
     agent_history_enabled: bool = False
     agent_history_path: str = "local_notes/ask_history/ask_chat_history.jsonl"
     performance_cache_prewarm_enabled: bool = True
+    freshness_offseason_start: date = date(2026, 6, 20)
+    next_regular_season_start: date = date(2026, 10, 20)
 
 
 def get_settings() -> Settings:
@@ -90,6 +93,12 @@ def get_settings() -> Settings:
         metadata_dataset=os.getenv("BQ_METADATA_DATASET", "nba_metadata"),
         freshness_threshold_hours=int(os.getenv("API_FRESHNESS_THRESHOLD_HOURS", "36")),
         max_search_results=int(os.getenv("API_MAX_SEARCH_RESULTS", "12")),
+        freshness_offseason_start=date.fromisoformat(
+            os.getenv("NBA_FRESHNESS_OFFSEASON_START", "2026-06-20")
+        ),
+        next_regular_season_start=date.fromisoformat(
+            os.getenv("NBA_NEXT_REGULAR_SEASON_START", "2026-10-20")
+        ),
         openai_api_key=os.getenv("OPENAI_API_KEY") or None,
         openai_agent_model=os.getenv("OPENAI_AGENT_MODEL", "gpt-5.4-mini"),
         anthropic_api_key=os.getenv("ANTHROPIC_API_KEY") or None,

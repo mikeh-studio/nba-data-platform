@@ -15,6 +15,7 @@ import unicodedata
 from datetime import date, datetime, timedelta
 from io import BytesIO
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -33,6 +34,7 @@ from nba_api.stats.endpoints import (
 from nba_api.stats.static import players
 
 import player_similarity_model
+from publication import publish_candidates, quoted_table
 
 logger = logging.getLogger("nba_pipeline")
 
@@ -6390,45 +6392,37 @@ def write_player_similarity_tables(
     features_df: pd.DataFrame,
     archetypes_df: pd.DataFrame,
 ) -> None:
-    """Write similarity feature and archetype tables to BigQuery."""
-    seasons = sorted({str(value) for value in features_df["season"].dropna().unique()})
-    feature_table = bigquery.Table(
-        features_table_id, schema=_player_similarity_feature_schema()
+    """Stage validated outputs before atomically replacing both serving tables."""
+    player_similarity_model._validate_similarity_output_frames(
+        features_df, archetypes_df
     )
-    archetype_table = bigquery.Table(
-        archetypes_table_id, schema=_player_archetype_schema()
-    )
-    bq_client.create_table(feature_table, exists_ok=True)
-    bq_client.create_table(archetype_table, exists_ok=True)
-
-    delete_config = bigquery.QueryJobConfig(
-        query_parameters=[
-            bigquery.ArrayQueryParameter("seasons", "STRING", seasons),
-        ]
-    )
-    bq_client.query(
-        f"DELETE FROM `{features_table_id}` WHERE season IN UNNEST(@seasons)",
-        job_config=delete_config,
-    ).result()
-    bq_client.query(
-        f"DELETE FROM `{archetypes_table_id}` WHERE season IN UNNEST(@seasons)",
-        job_config=delete_config,
-    ).result()
-
-    feature_job_config = bigquery.LoadJobConfig(
-        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-        schema=_player_similarity_feature_schema(),
-        schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION],
-    )
-    archetype_job_config = bigquery.LoadJobConfig(
-        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
-        schema=_player_archetype_schema(),
-        schema_update_options=[bigquery.SchemaUpdateOption.ALLOW_FIELD_ADDITION],
-    )
-
-    bq_client.load_table_from_dataframe(
-        features_df, features_table_id, job_config=feature_job_config
-    ).result()
-    bq_client.load_table_from_dataframe(
-        archetypes_df, archetypes_table_id, job_config=archetype_job_config
-    ).result()
+    for frame in (features_df, archetypes_df):
+        if frame["season"].isna().any():
+            raise ValueError("season must not be null in similarity outputs")
+    keys = ["season", "player_id"]
+    if set(map(tuple, features_df[keys].values)) != set(
+        map(tuple, archetypes_df[keys].values)
+    ):
+        raise ValueError("Similarity outputs must contain identical season/player keys")
+    seasons = sorted({str(value) for value in features_df["season"].unique()})
+    suffix = uuid4().hex
+    candidates = []
+    for active_id, frame, schema in (
+        (features_table_id, features_df, _player_similarity_feature_schema()),
+        (archetypes_table_id, archetypes_df, _player_archetype_schema()),
+    ):
+        quoted_table(active_id)
+        candidate_id = f"{active_id}_candidate_{suffix}"
+        table = bigquery.Table(candidate_id, schema=schema)
+        table.expires = pd.Timestamp.now(tz="UTC").to_pydatetime() + timedelta(days=1)
+        bq_client.create_table(table)
+        bq_client.load_table_from_dataframe(
+            frame,
+            candidate_id,
+            job_config=bigquery.LoadJobConfig(
+                write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+                schema=schema,
+            ),
+        ).result()
+        candidates.append((active_id, candidate_id))
+    publish_candidates(bq_client, candidates, seasons=seasons)

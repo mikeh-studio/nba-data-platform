@@ -13,6 +13,22 @@ dbt parse --project-dir . --profiles-dir dbt/profiles --target dev
 make airflow-parse
 ```
 
+Publication/freshness regression coverage:
+
+```bash
+python -m pytest tests/test_publication.py tests/test_freshness.py -q
+.venv-airflow/bin/python -m pytest tests/test_dag_import.py tests/test_publication.py -q
+dbt parse --project-dir . --profiles-dir dbt/profiles --target dev \
+  --vars '{"injury_publication_suffix": "_candidate_validation"}'
+```
+
+These cover candidate load failures, aborted transactions, invalid/mismatched
+similarity keys, additive schema changes, optional-stage retries, core/optional
+dbt failure isolation, offseason/preseason behavior, opening-day grace, and old
+source dates after a recent pipeline run. They do not execute BigQuery DML.
+Live promotion/rollback validation should use disposable tables in a test
+dataset, never deliberate failures against production serving tables.
+
 `dbt parse` does not require warehouse access.
 
 ## BigQuery-Backed Checks

@@ -1,5 +1,7 @@
 {{ config(
     materialized='table',
+    hours_to_expiration=24 if var('injury_publication_suffix', '') else none,
+    alias='player_availability_current' ~ var('injury_publication_suffix', ''),
     schema=env_var('BQ_DATASET_GOLD', env_var('BQ_DATASET', 'nba_gold'))
 ) }}
 

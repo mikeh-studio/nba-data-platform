@@ -7,6 +7,7 @@ import {
   addTrackedPlayer,
   buildCompareHref,
   formatHealthStatusText,
+  formatAssetHealthText,
   formatSeasonCoverage,
   loadTrackedPlayers,
   normalizeTrackedPayload,
@@ -102,4 +103,23 @@ test("formatHealthStatusText combines last refresh and season coverage", () => {
     formatHealthStatusText(payload, "season-coverage"),
     /^Last refresh 1 day ago - 2025-26 full season$/
   );
+});
+
+
+test("offseason status keeps completed data separate from fresh data", () => {
+  assert.equal(formatHealthStatusText({status: "offseason"}), "Offseason — waiting for regular-season games");
+  assert.equal(formatHealthStatusText({status: "partially_updated", season_phase: "offseason"}), "Partially updated — check data sources");
+  assert.equal(formatHealthStatusText({status: "awaiting_refresh"}), "Regular season started — awaiting first refresh");
+  assert.equal(formatHealthStatusText({status: "stale"}), "Data update overdue");
+});
+
+
+test("asset health distinguishes retained publication time from source date", () => {
+  const text = formatAssetHealthText({
+    label: "Similarity", status: "refresh_failed", serving_previous_version: true,
+    last_successful_finished_at_utc: "2026-06-19T12:00:00+00:00", latest_source_date: "2026-06-18",
+  });
+  assert.match(text, /serving previous version/);
+  assert.match(text, /Last successful refresh: Jun 19, 2026/);
+  assert.match(text, /Latest source data: Jun 18, 2026/);
 });

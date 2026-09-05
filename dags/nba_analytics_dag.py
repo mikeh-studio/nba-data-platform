@@ -10,6 +10,7 @@ run metadata instead of blocking the core refresh watermark.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -26,6 +27,7 @@ from nba_pipeline_triage import (
     write_pipeline_triage_on_failure,
     write_pipeline_triage_on_success,
 )
+from optional_assets import optional_injury_stage, publication_details
 
 logger = logging.getLogger("nba_pipeline")
 SUPPORTED_SEASON = "2025-26"
@@ -757,6 +759,7 @@ def nba_analytics_pipeline():
         }
 
     @task(retries=2, retry_delay=timedelta(minutes=5))
+    @optional_injury_stage
     def extract_injury_reports() -> dict:
         """Fetch bounded official NBA injury report snapshots and land a CSV."""
         import pandas as pd
@@ -863,13 +866,6 @@ def nba_analytics_pipeline():
             delay=get_float_config("NBA_INJURY_REPORT_DELAY_SECONDS", "0.25"),
             **get_nba_api_request_config(),
         )
-        candidate_watermark_date = max(
-            candidate["report_date"] for candidate in candidates
-        )
-        watermark_before_date = pipeline.coerce_to_date(watermark_before)
-        if watermark_before_date and candidate_watermark_date < watermark_before_date:
-            candidate_watermark_date = watermark_before_date
-        candidate_watermark = candidate_watermark_date.isoformat()
         if injury_df.empty:
             logger.info("No official injury report rows returned for candidates")
             return {
@@ -886,7 +882,7 @@ def nba_analytics_pipeline():
                     location=location,
                 ),
                 "watermark_before": watermark_before,
-                "watermark_after": candidate_watermark,
+                "watermark_after": watermark_before,
             }
 
         raw_snapshot_uri = persist_source_extract_snapshot(
@@ -1147,6 +1143,7 @@ def nba_analytics_pipeline():
         }
 
     @task(retries=2, retry_delay=timedelta(minutes=2))
+    @optional_injury_stage
     def load_injury_report_staging(extract_result: dict) -> dict:
         """Load landed official injury report rows to staging."""
         from google.cloud import bigquery as bq
@@ -1286,6 +1283,7 @@ def nba_analytics_pipeline():
         return load_result
 
     @task(retries=0)
+    @optional_injury_stage
     def dq_injury_report_staging(load_result: dict) -> dict:
         """Run DQ checks for official injury report rows."""
         from google.cloud import bigquery as bq
@@ -1557,6 +1555,7 @@ def nba_analytics_pipeline():
         }
 
     @task(retries=1, retry_delay=timedelta(minutes=2))
+    @optional_injury_stage
     def merge_injury_reports(load_result: dict) -> dict:
         """Merge staged official injury report rows into the bronze raw table."""
         from google.cloud import bigquery as bq
@@ -1673,6 +1672,7 @@ def nba_analytics_pipeline():
             "season": game_result["season"],
             "watermark_before": game_result.get("watermark_before"),
             "watermark_after": game_result.get("watermark_after"),
+            "injury_status": injury_report_result.get("asset_status", "no_change"),
             "injury_watermark_before": injury_report_result.get("watermark_before"),
             "injury_watermark_after": injury_report_result.get("watermark_after"),
             "gcs_uri": ",".join(all_gcs),
@@ -1814,18 +1814,8 @@ def nba_analytics_pipeline():
             "source:gold_runtime.analysis_snapshots",
             "path:dbt/tests/no_duplicate_analysis_snapshots.sql",
         ]
-        if injury_only_build:
-            # Keep the global runtime excludes even for the targeted injury build;
-            # dbt applies --select and --exclude together, and these exclusions
-            # are intentionally outside the injury model/test selector.
-            command.extend(
-                [
-                    "--select",
-                    "stg_player_injury_reports_clean",
-                    "player_availability_current",
-                ]
-            )
-        merge_result["dbt_build_scope"] = "injury_only" if injury_only_build else "full"
+        command.append("stg_player_injury_reports_clean+")
+        merge_result["dbt_build_scope"] = "injury_only" if injury_only_build else "core"
 
         env = os.environ.copy()
         env.setdefault("BQ_PROJECT", get_project_id())
@@ -1839,24 +1829,97 @@ def nba_analytics_pipeline():
         env.setdefault("BQ_DATASET_AGENT", get_dataset("BQ_DATASET_AGENT", "nba_agent"))
         env.setdefault("NBA_SEASON", SUPPORTED_SEASON)
         merge_result["dbt_command"] = " ".join(command)
-        completed = subprocess.run(
-            command,
-            cwd=repo_root,
-            env=env,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        if completed.returncode != 0:
-            raise AirflowException(
-                summarize_subprocess_failure(
-                    command=command,
-                    returncode=completed.returncode,
-                    stdout=completed.stdout,
-                    stderr=completed.stderr,
-                )
+        if not injury_only_build:
+            completed = subprocess.run(
+                command,
+                cwd=repo_root,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
             )
-        merge_result["dbt_status"] = "success"
+            if completed.returncode != 0:
+                raise AirflowException(
+                    summarize_subprocess_failure(
+                        command=command,
+                        returncode=completed.returncode,
+                        stdout=completed.stdout,
+                        stderr=completed.stderr,
+                    )
+                )
+            merge_result["dbt_status"] = "success"
+        else:
+            merge_result["dbt_status"] = "skipped"
+
+        # dbt writes the injury branch and dependent agent context to unique
+        # candidates. Tests finish before any of these become serving tables.
+        from google.cloud import bigquery as bq
+
+        from publication import expire_candidate, publish_candidates
+
+        suffix = "_candidate_" + uuid.uuid4().hex
+        candidate_command = command[:-1] + [
+            "--select",
+            "stg_player_injury_reports_clean+",
+            "--vars",
+            json.dumps({"injury_publication_suffix": suffix}),
+        ]
+        candidates = [
+            (
+                f"{get_project_id()}.{get_dataset(dataset_key, default)}.{name}",
+                f"{get_project_id()}.{get_dataset(dataset_key, default)}.{name}{suffix}",
+            )
+            for dataset_key, default, name in (
+                ("BQ_DATASET_SILVER", "nba_silver", "stg_player_injury_reports_clean"),
+                ("BQ_DATASET_GOLD", "nba_gold", "player_availability_current"),
+                ("BQ_DATASET_AGENT", "nba_agent", "agent_player_search"),
+            )
+        ]
+        client = None
+        try:
+            client = bq.Client(project=get_project_id())
+            completed = subprocess.run(
+                candidate_command,
+                cwd=repo_root,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if completed.returncode != 0:
+                raise AirflowException(
+                    summarize_subprocess_failure(
+                        command=candidate_command,
+                        returncode=completed.returncode,
+                        stdout=completed.stdout,
+                        stderr=completed.stderr,
+                    )
+                )
+            for _, candidate_id in candidates:
+                expire_candidate(client, candidate_id)
+            publish_candidates(client, candidates)
+            merge_result["injury_dbt_status"] = "success"
+        except Exception:
+            logger.exception(
+                "Injury model publish failed; keeping previous serving tables"
+            )
+            merge_result["injury_status"] = "failed_non_blocking"
+            merge_result["injury_dbt_status"] = "failed_non_blocking"
+        finally:
+            # Failed dbt builds can leave some candidate tables behind.
+            from google.api_core.exceptions import NotFound
+
+            for _, candidate_id in candidates if client is not None else []:
+                try:
+                    expire_candidate(client, candidate_id)
+                except NotFound:
+                    pass
+                except Exception:
+                    logger.warning(
+                        "Could not expire injury candidate %s",
+                        candidate_id,
+                        exc_info=True,
+                    )
         return merge_result
 
     @task(retries=1, retry_delay=timedelta(minutes=2))
@@ -2097,8 +2160,11 @@ def nba_analytics_pipeline():
                 season=run_result["season"],
                 watermark_date=run_result["watermark_after"],
             )
-        if run_result.get("injury_report_candidate_count", 0) > 0 and run_result.get(
-            "injury_watermark_after"
+        if (
+            run_result.get("injury_report_rows_loaded", 0) > 0
+            and run_result.get("injury_status") != "failed_non_blocking"
+            and run_result.get("injury_dbt_status") == "success"
+            and run_result.get("injury_watermark_after")
         ):
             pipeline.upsert_ingestion_state(
                 client,
@@ -2128,7 +2194,8 @@ def nba_analytics_pipeline():
             watermark_after=run_result["watermark_after"],
             started_at_utc=context["data_interval_start"],
             finished_at_utc=datetime.now(tz=context["data_interval_start"].tzinfo),
-            details=(
+            details=publication_details(run_result)
+            + (
                 f"dbt_status={run_result.get('dbt_status', 'unknown')};"
                 f"dbt_build_scope={run_result.get('dbt_build_scope', 'unknown')};"
                 f"similarity_status={run_result.get('similarity_status', 'deferred_non_blocking')};"

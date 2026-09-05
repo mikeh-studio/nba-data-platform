@@ -40,6 +40,37 @@ The Airflow DAG in `dags/nba_analytics_dag.py` runs this path:
 14. Publish watermark and run metadata to `nba_metadata`, including any
     non-blocking asset status.
 
+### Publication and partial failures
+
+Injury extraction, staging, DQ, and bronze merge stages retain their configured
+Airflow retries. On the final failed attempt they return a failed asset status;
+downstream injury stages short-circuit, allowing valid core stats to continue.
+Empty injury responses never advance the injury watermark.
+
+dbt builds the core excluding `stg_player_injury_reports_clean+`. It then builds
+that injury branch (clean injury rows, current availability, and dependent agent
+context) under unique candidate aliases using `injury_publication_suffix`.
+Candidate models expire after 24 hours. Only a successful dbt build, including
+its tests, can publish all three serving tables in a single BigQuery transaction.
+An injury failure leaves their previous serving versions intact. On the first
+ever build, an unsuccessful optional publication may leave those tables absent;
+the health response does not claim a previous version exists in that case.
+
+Similarity output validation precedes both candidate loads. After both finish,
+one transaction replaces the affected seasons in the feature and archetype
+tables together. Load or transaction failure leaves previous rows untouched.
+Nullable schema additions occur before DML; incompatible schema changes reject
+publication. Candidate cleanup failure cannot turn a committed publication into
+a reported failure; expiration provides a fallback cleanup mechanism.
+
+The run log retains `status=success` to mean core success and adds explicit
+`publication_status`, `stats_status`, `injuries_status`, and source dates to its
+existing details field. Health aggregates asset success/failure attempts across
+runs so later no-op runs cannot hide a failed optional publication. These
+records use pipeline completion time as publication time, an upper bound on the
+actual table commit. A worker failure before metadata publication can leave
+newer serving data than the recorded status; it does not remove serving data.
+
 ## Warehouse Layout
 
 Bronze raw tables:

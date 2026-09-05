@@ -68,7 +68,6 @@ from app.repository._helpers import (
     _window_reason,
     _window_state,
     build_analysis_payload,
-    build_freshness_payload,
     build_headshot_url,
     build_player_initials,
     build_reason_summary,
@@ -2112,6 +2111,7 @@ class BigQueryWarehouseRepository:
         FROM {table}
         WHERE season = @season
           AND status = 'success'
+          AND source_system = 'nba_api'
         ORDER BY finished_at_utc DESC
         LIMIT 1
         """
@@ -3760,15 +3760,59 @@ class BigQueryWarehouseRepository:
             "in_requested_cohort": row.get("cohort_rank") is not None,
         }
 
-    def get_health(self) -> dict[str, Any]:
-        latest_run = self.get_latest_successful_run()
-        payload = build_freshness_payload(
-            latest_run,
-            now=datetime.now(tz=UTC),
-            freshness_threshold_hours=self.settings.freshness_threshold_hours,
+    def get_asset_publication_history(self) -> list[dict[str, Any]] | None:
+        table = f"`{self.settings.project_id}.{self.settings.metadata_dataset}.pipeline_run_log`"
+        # Skipped/no-change runs do not reset the last publication or erase a
+        # previous failure. Historical logs remain readable without migration.
+        sql = f"""
+        WITH runs AS (
+          SELECT finished_at_utc, watermark_after, rows_loaded, details
+          FROM {table}
+          WHERE season = @season AND source_system = 'nba_api' AND status = 'success'
+        ), attempts AS (
+          SELECT finished_at_utc, asset.* FROM runs,
+          UNNEST([
+            STRUCT('stats' AS asset,
+              COALESCE(REGEXP_EXTRACT(details, r'(?:^|;)stats_status=([^;]*)'),
+                IF(rows_loaded > 0 AND REGEXP_CONTAINS(details, r'(?:^|;)dbt_status=success;'),
+                   'success', 'no_change')) AS attempt_status,
+              watermark_after AS source_date),
+            STRUCT('injuries' AS asset,
+              COALESCE(REGEXP_EXTRACT(details, r'(?:^|;)injuries_status=([^;]*)'),
+                IF(SAFE_CAST(REGEXP_EXTRACT(details, r'(?:^|;)injury_report_rows_loaded=([^;]*)') AS INT64) > 0,
+                   'success', 'no_change')) AS attempt_status,
+              SAFE_CAST(REGEXP_EXTRACT(details, r'(?:^|;)injuries_source_date=([^;]*)') AS DATE) AS source_date),
+            STRUCT('similarity' AS asset,
+              REGEXP_EXTRACT(details, r'(?:^|;)similarity_status=([^;]*)') AS attempt_status,
+              watermark_after AS source_date)
+          ]) AS asset
         )
-        payload["season"] = SUPPORTED_SEASON
-        coverage = self.get_season_coverage()
-        if coverage is not None:
-            payload["season_coverage"] = coverage
-        return payload
+        SELECT asset,
+          ARRAY_AGG(STRUCT(attempt_status, finished_at_utc)
+            ORDER BY finished_at_utc DESC LIMIT 1)[OFFSET(0)].attempt_status AS last_attempt_status,
+          MAX(finished_at_utc) AS last_attempt_at_utc,
+          MAX(IF(attempt_status = 'success', finished_at_utc, NULL)) AS last_successful_finished_at_utc,
+          ARRAY_AGG(IF(attempt_status = 'success', STRUCT(source_date), NULL)
+            IGNORE NULLS ORDER BY finished_at_utc DESC LIMIT 1)[SAFE_OFFSET(0)].source_date AS latest_source_date
+        FROM attempts
+        WHERE attempt_status IN ('success', 'failed_non_blocking')
+        GROUP BY asset
+        """
+        try:
+            return self._query(
+                sql,
+                [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)],
+            )
+        except BQAPIError:
+            return None
+
+    def get_health(self) -> dict[str, Any]:
+        from app.freshness import build_publication_health
+
+        return build_publication_health(
+            self.get_latest_successful_run(),
+            self.get_asset_publication_history(),
+            self.get_season_coverage(),
+            settings=self.settings,
+            now=datetime.now(tz=UTC),
+        )

@@ -261,3 +261,9 @@ See [Validation](docs/validation.md) for the full QA matrix.
 - The public service is read-only and queries curated serving tables.
 - Local Airflow logs, dbt logs, pipeline triage output, notebooks, and build
   artifacts are ignored by git.
+
+## Model catalog maintenance
+
+A daily catalog review workflow flags model availability changes without changing
+Ask's selection. See [model catalog review](docs/model-catalog.md) for local checks,
+GitHub Actions setup, and the three-question candidate compatibility smoke test.

@@ -1592,8 +1592,13 @@ def test_ask_page_smoke() -> None:
     assert "data-agent-clear-history" in response.text
     assert "agent-player-profile" in response.text
     assert "agent-answer-markdown" in response.text
-    assert "gpt-5.5" in response.text
-    assert "claude-fable-5" in response.text
+    assert "gpt-6-astra" in response.text
+    assert "gpt-5.6-sol" in response.text
+    assert "gpt-5.6-terra" in response.text
+    assert "gpt-5.6-luna" in response.text
+    assert "claude-fable-5-1" in response.text
+    assert "claude-opus-5" in response.text
+    assert "claude-sonnet-5" in response.text
     assert "Claude (Anthropic)" in response.text
     assert ">ASK</a>" in response.text
     assert ">TRENDS</a>" in response.text
@@ -1789,12 +1794,12 @@ def test_api_agent_ask_uses_selected_openai_model() -> None:
     )
     response = client.post(
         "/api/agent/ask",
-        json={"question": "How is Tyrese Maxey trending?", "model": "gpt-5.5"},
+        json={"question": "How is Tyrese Maxey trending?", "model": "gpt-6-astra"},
     )
 
     assert response.status_code == 200
     assert fake_openai.responses.calls == 2
-    assert all(call["model"] == "gpt-5.5" for call in fake_openai.responses.kwargs)
+    assert all(call["model"] == "gpt-6-astra" for call in fake_openai.responses.kwargs)
 
 
 def test_api_agent_ask_rejects_model_for_wrong_provider(caplog) -> None:

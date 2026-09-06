@@ -2759,3 +2759,53 @@ def test_similarity_map_page_has_search_and_panel() -> None:
     assert 'id="map-search-input"' in response.text
     assert 'id="map-panel"' in response.text
     assert "true nearest matches" in response.text
+
+
+class WhatChangedRepository(FakeRepository):
+    def __init__(self):
+        self.calls = []
+
+    def get_what_changed(self, **kwargs):
+        self.calls.append(kwargs)
+        return {"state": "empty", "items": [], **kwargs}
+
+
+def test_what_changed_page_and_parameterized_cached_endpoint():
+    repo = WhatChangedRepository()
+    client = build_client(repo)
+    page = client.get("/what-changed")
+    assert page.status_code == 200
+    assert "What Changed?" in page.text
+    assert f"what_changed.js?v={STATIC_VERSION}" in page.text
+    assert "Top performers" in page.text
+    assert "DNP-CD" in page.text
+    response = client.get(
+        "/api/what-changed?period=week&season_type=Playoffs&as_of=2026-06-14"
+    )
+    assert response.status_code == 200
+    assert response.json()["period"] == "week"
+    assert repo.calls == [
+        {"period": "week", "season_type": "Playoffs", "as_of": "2026-06-14"}
+    ]
+    assert (
+        client.get(
+            "/api/what-changed?period=week&season_type=Playoffs&as_of=2026-06-14"
+        ).status_code
+        == 200
+    )
+    assert len(repo.calls) == 1
+    assert client.get("/api/what-changed?period=unsafe").status_code == 422
+    assert client.get("/api/what-changed?as_of=not-a-date").status_code == 422
+    assert client.get("/api/what-changed?season_type=Preseason").status_code == 422
+
+
+def test_what_changed_source_failure_is_not_a_partial_league_ranking():
+    from app.what_changed import WhatChangedUnavailable
+
+    class MissingRepository(WhatChangedRepository):
+        def get_what_changed(self, **kwargs):
+            raise WhatChangedUnavailable("private warehouse diagnostic")
+
+    response = build_client(MissingRepository()).get("/api/what-changed")
+    assert response.status_code == 503
+    assert "private warehouse diagnostic" not in response.text

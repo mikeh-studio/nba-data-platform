@@ -216,7 +216,7 @@
       width: 1rem;
       height: 1rem;
       border: 1px solid rgba(231, 224, 212, 0.42);
-      border-radius: 999px;
+      border-radius: 0;
       color: var(--muted);
       background: rgba(255, 255, 255, 0.04);
       font-family: var(--font-mono);
@@ -238,10 +238,10 @@
       width: min(22rem, 72vw);
       padding: 0.65rem 0.75rem;
       border: 1px solid rgba(231, 224, 212, 0.18);
-      border-radius: 8px;
+      border-radius: 0;
       color: var(--ink);
       background: rgba(17, 20, 24, 0.98);
-      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.34);
+      box-shadow: none;
       font-family: var(--font-body);
       font-size: 0.78rem;
       font-weight: 500;
@@ -265,7 +265,7 @@
       min-width: 4.5rem;
       justify-content: center;
       padding: 0.3rem 0.5rem;
-      border-radius: 999px;
+      border-radius: 0;
       border: 1px solid var(--line);
       font-family: var(--font-mono);
       font-size: 0.74rem;
@@ -315,12 +315,10 @@
       max-height: min(84vh, 720px);
       overflow: auto;
       border: 1px solid rgba(255, 81, 43, 0.3);
-      border-radius: 8px;
+      border-radius: 0;
       padding: 1.15rem;
-      background:
-        linear-gradient(135deg, rgba(255, 81, 43, 0.12), transparent 34%),
-        var(--panel);
-      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.42);
+      background: var(--surface);
+      box-shadow: none;
     }
     .performance-modal-close {
       position: absolute;
@@ -331,7 +329,7 @@
       height: 2rem;
       place-items: center;
       border: 1px solid var(--line);
-      border-radius: 999px;
+      border-radius: 0;
       color: var(--muted);
       background: rgba(255, 255, 255, 0.04);
       font-size: 1.2rem;

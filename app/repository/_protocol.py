@@ -7,9 +7,18 @@ from app.repository._constants import (
     CompareFocus,
     CompareWindow,
 )
+from app.what_changed import ComparisonPeriod, SeasonPhase
 
 
 class WarehouseRepository(Protocol):
+    def get_what_changed(
+        self,
+        *,
+        period: ComparisonPeriod = "four_games",
+        season_type: SeasonPhase = "Regular Season",
+        as_of: str | None = None,
+    ) -> dict[str, Any]: ...
+
     def get_dashboard(self, as_of_date: str | None = None) -> dict[str, Any]: ...
 
     def get_leaderboard(self, limit: int = 10) -> list[dict[str, Any]]: ...

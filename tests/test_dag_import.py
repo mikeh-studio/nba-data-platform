@@ -82,7 +82,7 @@ def test_dbt_injury_candidates_cannot_block_or_replace_successful_core(
         assert published == []
     else:
         assert result["injury_dbt_status"] == "success"
-        assert len(published) == 3
+        assert len(published) == 4
         assert all(
             "_candidate_" in candidate and "_candidate_" not in active
             for active, candidate in published

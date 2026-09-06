@@ -107,6 +107,21 @@ deduped as (
         {% else %}
         cast(null as {{ float64_type() }}) as plus_minus,
         {% endif %}
+        {% if 'pf' in ns.column_names %}
+        cast(pf as {{ float64_type() }}) as pf,
+        {% else %}
+        cast(null as {{ float64_type() }}) as pf,
+        {% endif %}
+        {% if 'oreb' in ns.column_names %}
+        cast(oreb as {{ float64_type() }}) as oreb,
+        {% else %}
+        cast(null as {{ float64_type() }}) as oreb,
+        {% endif %}
+        {% if 'dreb' in ns.column_names %}
+        cast(dreb as {{ float64_type() }}) as dreb,
+        {% else %}
+        cast(null as {{ float64_type() }}) as dreb,
+        {% endif %}
         cast(pts as {{ int64_type() }}) as pts,
         cast(reb as {{ int64_type() }}) as reb,
         cast(ast as {{ int64_type() }}) as ast,
@@ -156,6 +171,9 @@ select
     fg3m,
     fg3a,
     plus_minus,
+    pf,
+    oreb,
+    dreb,
     pts,
     reb,
     ast,

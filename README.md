@@ -8,8 +8,8 @@ pairs a natural-language `/ask` stats agent that can call the OpenAI API or
 Claude API with Performance insights for recent player form, backed by BigQuery,
 dbt, Airflow, and a Cloud Run-ready FastAPI service.
 
-**Platform scope:** 30 dbt SQL models transform six NBA source domains into 16
-gold serving models for a read-only FastAPI workbench and stats agent.
+**Platform scope:** 31 dbt SQL models transform six NBA source domains into
+curated gold serving models for a read-only FastAPI workbench and stats agent.
 
 ![Ask page](docs/images/ask-page.png)
 
@@ -36,6 +36,10 @@ Optional portfolio paths include Redshift Serverless as a secondary warehouse.
   metrics, and a lightweight player snapshot modal.
 - **Research views**: player detail, comparisons, rankings, leaderboards,
   recommendations, and a 3D player similarity map support deeper stat review.
+- **What Changed?**: `/what-changed` separates top performers from surging
+  players over four team games or complete calendar weeks, with availability,
+  offense, defense, and individual game evidence. See the
+  [metric contract and rollout notes](docs/what-changed.md).
 - **Analytics engineering backbone**: source contracts, dbt models,
   orchestration, metadata, and read-only serving keep the public app tied to
   curated warehouse outputs.

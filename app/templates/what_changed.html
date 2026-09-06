@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block content %}
+<link rel="stylesheet" href="/static/what_changed.css?v={{ static_version }}" />
+<section class="hero changed-hero">
+  <div class="eyebrow">League-wide movers · {{ season }}</div>
+  <h1>What Changed?</h1>
+  <p class="subhead">Explore changes in playing time and production. Select a player to inspect availability, offense, defense, and the games behind the movement.</p>
+</section>
+<form class="card changed-controls" id="changed-controls">
+  <label>Compare
+    <select class="select" name="period" id="changed-period">
+      <option value="four_games">Last 4 team games vs previous 4</option>
+      <option value="week">Latest complete week vs previous week</option>
+    </select>
+  </label>
+  <label>Season phase
+    <select class="select" name="season_type" id="changed-phase">
+      <option value="Regular Season">Regular season</option><option value="Playoffs">Playoffs</option>
+    </select>
+  </label>
+  <label>Through date <span class="meta">(blank = latest data)</span>
+    <input class="input" name="as_of" id="changed-date" type="date" />
+  </label>
+  <button class="button" type="submit">Update</button>
+</form>
+<div class="changed-context">
+  <p class="meta" id="changed-dates" aria-live="polite"></p>
+  <p class="meta">A four-game sample is descriptive, not a forecast. During the offseason this remains a dated view of the completed season.</p>
+</div>
+<section class="card changed-discovery">
+  <div class="changed-view-controls">
+    <div class="tab-list" aria-label="Mover ranking">
+      <button class="tab-button is-active" type="button" data-mover-view="top" aria-pressed="true">Top performers</button>
+      <button class="tab-button" type="button" data-mover-view="surging" aria-pressed="false">Surging</button>
+    </div>
+    <label class="changed-search">Find player or team
+      <input class="input" id="changed-search" type="search" placeholder="Search the league" />
+    </label>
+  </div>
+  <p id="changed-ranking" class="meta"></p>
+  <p id="changed-status" role="status" aria-live="polite">Loading league movers…</p>
+  <div class="changed-workspace">
+    <div class="changed-overview">
+      <div id="changed-chart"></div>
+      <p id="changed-chart-note" class="meta"></p>
+      <div id="changed-list" class="changed-list" aria-label="Ranked players" aria-busy="true"></div>
+      <button class="button" type="button" id="changed-more" hidden>Show more players</button>
+    </div>
+    <aside id="changed-detail" aria-label="Selected player details"></aside>
+  </div>
+</section>
+<details class="card changed-method">
+  <summary>How rankings and availability work</summary>
+  <p>Top performers rank by recent per-appearance production: PTS + REB + AST + STL + BLK − TOV. Surging ranks the largest positive change in that same index. This is a transparent box-score proxy, not your fantasy league’s scoring system or a complete basketball rating.</p>
+  <p>Four-game rankings require at least 3 recorded appearances and 10 minutes per appearance in a full four-team-game window. Surging also requires at least 3 previous appearances. Weekly comparisons use two complete Monday–Sunday weeks and at least 2 appearances in each window for surging. Team changes exclude players from surge rankings.</p>
+  <p>Production is per recorded appearance; counting-stat totals are also shown for fantasy volume. Shooting percentages use total makes and attempts, and their changes are percentage points. Defense covers box-score events, not overall defensive impact.</p>
+  <p>“No recorded appearance” does not establish a DNP-CD, injury absence, or roster membership. DNP-CD reasons are not collected by the current source. Injury reports show reported statuses and coverage, not confirmed reasons for missing a game.</p>
+</details>
+<script type="module" src="/static/what_changed.js?v={{ static_version }}"></script>
+{% endblock %}

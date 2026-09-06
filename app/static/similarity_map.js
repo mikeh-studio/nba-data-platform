@@ -176,12 +176,12 @@
 
   function axis(title) {
     return {
-      title: { text: title, font: { color: FONT_COLOR } },
+      title: { text: title, font: { family: "Barlow, Arial, sans-serif", color: FONT_COLOR } },
       backgroundcolor: AXIS_BG,
       gridcolor: GRID_COLOR,
       zerolinecolor: GRID_COLOR,
       showbackground: true,
-      tickfont: { color: FONT_COLOR, size: 10 },
+      tickfont: { family: "Barlow, Arial, sans-serif", color: FONT_COLOR, size: 10 },
     };
   }
 
@@ -357,7 +357,7 @@
       z: nz,
       text: nNames,
       textposition: "top center",
-      textfont: { color: FONT_COLOR, size: 10 },
+      textfont: { family: "Barlow, Arial, sans-serif", color: FONT_COLOR, size: 10 },
       hovertext: nHover,
       hovertemplate: "%{hovertext}<extra></extra>",
       marker: {
@@ -582,11 +582,11 @@
     plotLayout = {
       paper_bgcolor: AXIS_BG,
       plot_bgcolor: AXIS_BG,
-      font: { color: FONT_COLOR },
+      font: { family: "Barlow, Arial, sans-serif", color: FONT_COLOR },
       margin: { l: 0, r: 0, t: 0, b: 0 },
       showlegend: true,
       legend: {
-        font: { color: FONT_COLOR, size: 11 },
+        font: { family: "Barlow, Arial, sans-serif", color: FONT_COLOR, size: 11 },
         bgcolor: AXIS_BG,
         itemsizing: "constant",
       },

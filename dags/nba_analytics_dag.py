@@ -1873,6 +1873,7 @@ def nba_analytics_pipeline():
                 ("BQ_DATASET_SILVER", "nba_silver", "stg_player_injury_reports_clean"),
                 ("BQ_DATASET_GOLD", "nba_gold", "player_availability_current"),
                 ("BQ_DATASET_AGENT", "nba_agent", "agent_player_search"),
+                ("BQ_DATASET_GOLD", "nba_gold", "what_changed_injury_reports"),
             )
         ]
         client = None

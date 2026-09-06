@@ -46,9 +46,10 @@ from app.repository import (
     get_compare_window_options,
 )
 from app.telemetry import instrument_compare_view, instrument_player_view
+from app.what_changed import ComparisonPeriod, SeasonPhase, WhatChangedUnavailable
 
 BASE_DIR = Path(__file__).resolve().parent
-STATIC_VERSION = "20260905-publication-health-v1"
+STATIC_VERSION = "20260905-sports-journal-v2"
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["static_version"] = STATIC_VERSION
 TRACKING_CAP = 8
@@ -991,6 +992,45 @@ def performance_page(
         "tracking_cap": TRACKING_CAP,
     }
     return templates.TemplateResponse(request, "performance.html", context)
+
+
+@app.get("/what-changed", response_class=HTMLResponse)
+def what_changed_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        request,
+        "what_changed.html",
+        {
+            "request": request,
+            "page_title": "What Changed?",
+            "season": SUPPORTED_SEASON,
+        },
+    )
+
+
+@app.get("/api/what-changed")
+def api_what_changed(
+    response: Response,
+    repo: Annotated[WarehouseRepository, Depends(get_repository)],
+    period: ComparisonPeriod = "four_games",
+    season_type: SeasonPhase = "Regular Season",
+    as_of: date | None = None,
+) -> dict[str, Any]:
+    cutoff = as_of.isoformat() if as_of else None
+    try:
+        payload = _get_cached_payload(
+            (_repo_cache_token(repo), "what_changed", period, season_type, cutoff),
+            900,
+            lambda: repo.get_what_changed(
+                period=period, season_type=season_type, as_of=cutoff
+            ),
+        )
+    except WhatChangedUnavailable as exc:
+        raise HTTPException(
+            status_code=503,
+            detail="What Changed data is temporarily unavailable. Try again later.",
+        ) from exc
+    _set_public_cache_header(response, 60)
+    return payload
 
 
 @app.get("/api/similarity-map")

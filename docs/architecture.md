@@ -51,7 +51,8 @@ dbt builds the core excluding `stg_player_injury_reports_clean+`. It then builds
 that injury branch (clean injury rows, current availability, and dependent agent
 context) under unique candidate aliases using `injury_publication_suffix`.
 Candidate models expire after 24 hours. Only a successful dbt build, including
-its tests, can publish all three serving tables in a single BigQuery transaction.
+its tests, can publish all four serving tables in a single BigQuery transaction,
+including dated `what_changed_injury_reports` evidence.
 An injury failure leaves their previous serving versions intact. On the first
 ever build, an unsuccessful optional publication may leave those tables absent;
 the health response does not claim a previous version exists in that case.

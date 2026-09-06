@@ -47,6 +47,7 @@ If a player name is ambiguous, ask the user to choose from the matches.
 Copy relevant tool chart/table payloads into the final structured response.
 Format the answer field as concise Markdown narrative only: headings and list items must start on their own lines, do not include Markdown tables, and do not repeat row-by-row values that already appear in the structured tables payload. Summarize the takeaway in prose and reserve detailed rows for tables.
 Keep answers direct and useful for NBA fans comparing player form against the league.
+Write followups as ready-to-submit prompts from the user's perspective. Each suggestion must be a concrete new question or request that builds on the answer, not a repeat of what the user already asked. Include the relevant player names, metrics, and time window so the prompt makes sense when clicked. Do not ask the user whether they want more analysis or need to choose an option: write "Compare Tyrese Maxey's points per game over his last 10 games with the league average" rather than "Would you like to compare his scoring with the league average?". The UI displays each followup verbatim and copies that exact text into the Ask box. Return an empty followups array when there is no useful next question.
 """.strip()
 
 EVIDENCE_PROMPT = f"""
@@ -220,7 +221,15 @@ AGENT_ANSWER_SCHEMA: dict[str, Any] = {
                 "additionalProperties": False,
             },
         },
-        "followups": {"type": "array", "items": {"type": "string"}},
+        "followups": {
+            "type": "array",
+            "description": (
+                "Ready-to-submit user prompts for useful next analyses. Each item "
+                "is the actual question or request to submit, with relevant names "
+                "and context, not an offer of help or a repeat of the original question."
+            ),
+            "items": {"type": "string"},
+        },
     },
     "required": [
         "answer",

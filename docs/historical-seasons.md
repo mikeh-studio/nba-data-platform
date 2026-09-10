@@ -84,6 +84,13 @@ build process have explicit time bounds.
   A supplied `<season>_injuries.parquet` must satisfy the injury contract.
   No injury rows means unavailable evidence, not a healthy player.
   `<season>_injury_source_checks.json` records every attempted daily archive.
+  Download and parsing failures are recorded per day with `status: error`;
+  other days continue. If no reports are usable, validation records missing
+  injury coverage. Transport/HTTP failures receive up to three attempts;
+  malformed headers stop after one. To retry failed days, remove only the
+  combined `<season>_injuries.parquet` and rerun extraction; successful daily
+  caches are reused. Local storage failures still abort because audit evidence
+  cannot be reliably saved.
   Later intraday status changes are outside this collection; discrepancies
   between an earlier Out report and actual appearances remain warning rows.
 - Historical pages show archive status and do not expect daily refreshes.

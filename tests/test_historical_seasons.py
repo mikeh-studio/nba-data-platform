@@ -254,3 +254,102 @@ def test_performance_reader_uses_physical_column_order():
     rows = repo._fetch_recent_performance_table_rows_api()
     assert float(rows[0]["pts_delta"]) == -9.3
     assert float(rows[0]["fg_pct_delta"]) == 0.148
+
+
+@pytest.mark.parametrize("failure", ["http", "timeout", "header", "parser"])
+def test_injury_extract_records_failed_day_and_preserves_success(
+    tmp_path, monkeypatch, failure
+):
+    import json
+    from collections import Counter
+
+    import requests
+    from scripts import historical_sources as sources
+
+    season = "2023-24"
+    for phase in ("Regular_Season", "Playoffs"):
+        pd.DataFrame({"GAME_DATE": ["2023-10-24"]}).to_parquet(
+            tmp_path / f"{season}_{phase}_players.parquet"
+        )
+    monkeypatch.setattr(sources.pipeline, "build_player_id_lookup", lambda: {})
+    monkeypatch.setattr(sources.time, "sleep", lambda _: None)
+    calls = Counter()
+
+    def get(url, **kwargs):
+        day = url.split("Injury-Report_")[1][:10]
+        calls[day] += 1
+        if day == "2023-10-23" and failure == "timeout":
+            raise requests.Timeout("source timeout")
+        response = requests.Response()
+        response.status_code = 503 if day == "2023-10-23" and failure == "http" else 200
+        response.url = url
+        response._content = day.encode()
+        return response
+
+    def extract(content):
+        day = content.decode()
+        if day == "2023-10-23" and failure == "parser":
+            raise RuntimeError("Malformed PDF")
+        # The first day's PDF incorrectly claims the following report date.
+        return "Injury Report: 10/24/23 05:30 PM"
+
+    monkeypatch.setattr(sources.requests, "get", get)
+    monkeypatch.setattr(
+        sources.pipeline, "extract_text_from_injury_report_pdf", extract
+    )
+    monkeypatch.setattr(
+        sources.pipeline,
+        "parse_injury_report_text",
+        lambda text, **kwargs: pd.DataFrame({"REPORT_DATE": [kwargs["report_date"]]}),
+    )
+    sources.extract_injuries(season, tmp_path)
+    output = tmp_path / f"{season}_injuries.parquet"
+    assert pd.read_parquet(output).REPORT_DATE.tolist() == ["2023-10-24"]
+    checks = json.loads((tmp_path / f"{season}_injury_source_checks.json").read_text())
+    assert checks[0]["status"] == "error"
+    assert checks[0]["rows"] == 0
+    assert checks[0]["error_type"]
+    assert checks[0]["attempts"] == (3 if failure in ("http", "timeout") else 1)
+    assert checks[1]["status"] == 200
+    assert checks[1]["rows"] == 1
+    assert calls["2023-10-24"] == 1
+    # Retrying revisits the failure and reuses the successful daily cache.
+    first_calls = calls["2023-10-23"]
+    output.unlink()
+    sources.extract_injuries(season, tmp_path)
+    assert calls["2023-10-23"] == 2 * first_calls
+    assert calls["2023-10-24"] == 1
+
+
+def test_injury_extract_all_unavailable_writes_empty_data_and_audit(
+    tmp_path, monkeypatch
+):
+    import json
+
+    import requests
+    from scripts import historical_sources as sources
+
+    season = "2023-24"
+    for phase in ("Regular_Season", "Playoffs"):
+        pd.DataFrame({"GAME_DATE": ["2023-10-24"]}).to_parquet(
+            tmp_path / f"{season}_{phase}_players.parquet"
+        )
+    monkeypatch.setattr(sources.pipeline, "build_player_id_lookup", lambda: {})
+    monkeypatch.setattr(sources.time, "sleep", lambda _: None)
+
+    def get(url, **kwargs):
+        response = requests.Response()
+        response.status_code = 404 if "2023-10-23" in url else 503
+        response.url = url
+        return response
+
+    monkeypatch.setattr(sources.requests, "get", get)
+    sources.extract_injuries(season, tmp_path)
+    frame = pd.read_parquet(tmp_path / f"{season}_injuries.parquet")
+    assert frame.empty
+    assert list(frame.columns) == [
+        f.name for f in sources.pipeline.get_injury_report_schema()
+    ]
+    checks = json.loads((tmp_path / f"{season}_injury_source_checks.json").read_text())
+    assert [c["status"] for c in checks] == [404, "error"]
+    assert all(c["rows"] == 0 for c in checks)

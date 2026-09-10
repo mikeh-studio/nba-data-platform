@@ -53,7 +53,9 @@ def extract_injuries(season: str, directory: Path) -> None:
         frame = pd.DataFrame(
             columns=[field.name for field in pipeline.get_injury_report_schema()]
         )
+        result = {"date": day, "url": url}
         for attempt in range(3):
+            response = None
             try:
                 response = requests.get(
                     url, headers=pipeline.OFFICIAL_INJURY_REPORT_HEADERS, timeout=20
@@ -74,12 +76,28 @@ def extract_injuries(season: str, directory: Path) -> None:
                     player_lookup=lookup,
                 )
                 break
-            except Exception:
-                if attempt == 2:
-                    raise
+            except Exception as exc:
+                result = {
+                    "date": day,
+                    "url": url,
+                    "status": "error",
+                    "http_status": response.status_code
+                    if response is not None
+                    else None,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                    "attempts": attempt + 1,
+                }
+                # Retry transport/HTTP failures, but a malformed PDF or wrong
+                # report header will not improve by parsing it again.
+                if not isinstance(exc, requests.RequestException) or attempt == 2:
+                    break
                 time.sleep(2)
         result["rows"] = len(frame)
-        frame.to_parquet(path, index=False)
+        # Failed days retain evidence but no reusable data cache. Removing the
+        # combined season output allows a retry to revisit only failed days.
+        if result["status"] != "error":
+            frame.to_parquet(path, index=False)
         evidence.write_text(json.dumps(result, indent=2))
         return frame, result
 
@@ -92,9 +110,11 @@ def extract_injuries(season: str, directory: Path) -> None:
             checks.append(result)
             if index % 30 == 0:
                 print(f"{season}: checked {index}/{len(dates)} injury PDFs", flush=True)
-    if not frames:
-        raise ValueError(f"No historical injury reports parsed for {season}")
-    combined = pd.concat(frames, ignore_index=True).drop_duplicates()
+    combined = (
+        pd.concat(frames, ignore_index=True).drop_duplicates()
+        if frames
+        else pd.DataFrame(columns=[f.name for f in pipeline.get_injury_report_schema()])
+    )
     combined.to_parquet(output, index=False)
     (directory / f"{season}_injury_source_checks.json").write_text(
         json.dumps(checks, indent=2)

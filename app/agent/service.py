@@ -31,7 +31,7 @@ from app.config import Settings
 from app.repository import WarehouseRepository
 
 SYSTEM_PROMPT = """
-You are an NBA stats analyst for the 2025-26 NBA Stats Desk site.
+You are an NBA stats analyst for NBA Stats Desk. The selected season is supplied with each request.
 Answer only from the provided tool results and curated gold-model semantics.
 Use tools for player identity, game logs, percentiles, trends, rankings, and similarity.
 Use calculate_player_percentile for questions asking where one player ranks in a metric cohort.
@@ -1365,7 +1365,8 @@ class StatsAgent:
         response = self._create_response(
             client=client,
             model=model,
-            instructions=EVIDENCE_PROMPT,
+            instructions=EVIDENCE_PROMPT
+            + f"\nSelected season: {self.settings.season}.",
             input_messages=evidence_messages,
             tools=None,
             text=TEXT_FORMAT,
@@ -1589,7 +1590,10 @@ class StatsAgent:
         # provider prompt cache survives across requests.
         input_messages.append({"role": "developer", "content": _route_hint(agent_plan)})
         tool_calls: list[dict[str, Any]] = []
-        instructions = SYSTEM_PROMPT
+        instructions = (
+            SYSTEM_PROMPT
+            + f"\nSelected season: {self.settings.season}. Only discuss this season unless tool evidence explicitly supports a comparison."
+        )
         max_tool_calls = max(1, self.settings.agent_max_tool_calls)
         tools = _tool_schemas_for_plan(agent_plan.required_tools)
 

@@ -16,7 +16,7 @@ sources:
               - not_null
               - accepted_values:
                   arguments:
-                    values: ['2025-26']
+                    values: ["{{ var('nba_season', '2025-26') }}"]
           - name: source_run_id
             tests: [not_null]
 
@@ -62,7 +62,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['2025-26']
+                values: ["{{ var('nba_season', '2025-26') }}"]
       - name: season_type
         tests:
           - not_null
@@ -94,7 +94,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['2025-26']
+                values: ["{{ var('nba_season', '2025-26') }}"]
       - name: shot_location_fga
       - name: shot_rim_rate
       - name: shot_paint_non_ra_rate
@@ -121,7 +121,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['2025-26']
+                values: ["{{ var('nba_season', '2025-26') }}"]
   - name: dim_team
     columns:
       - name: team_abbr
@@ -142,7 +142,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['2025-26']
+                values: ["{{ var('nba_season', '2025-26') }}"]
   - name: dim_game
     columns:
       - name: game_id
@@ -154,7 +154,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['2025-26']
+                values: ["{{ var('nba_season', '2025-26') }}"]
       - name: home_team_abbr
         tests:
           - not_null
@@ -231,7 +231,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['2025-26']
+                values: ["{{ var('nba_season', '2025-26') }}"]
       - name: stat
         tests:
           - not_null
@@ -254,7 +254,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['2025-26']
+                values: ["{{ var('nba_season', '2025-26') }}"]
       - name: player_id
         tests:
           - not_null
@@ -286,7 +286,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['2025-26']
+                values: ["{{ var('nba_season', '2025-26') }}"]
       - name: game_date
         tests: [not_null]
       - name: pts_leader
@@ -313,7 +313,7 @@ models:
           - not_null
           - accepted_values:
               arguments:
-                values: ['2025-26']
+                values: ["{{ var('nba_season', '2025-26') }}"]
       - name: season_type
         tests:
           - not_null

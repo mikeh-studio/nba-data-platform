@@ -1,3 +1,4 @@
+import { seasonFetch } from "./season.js";
 const escape = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({"&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;"}[char]));
 export const number = (value, signed = false) => value == null || !Number.isFinite(Number(value)) ? "—" : `${signed && Number(value) > 0 ? "+" : ""}${Number(value).toFixed(1)}`;
 export function selectMovers(items, view, search = "") {
@@ -81,7 +82,7 @@ export function renderOpportunityMap(points, selectedId) {
   </svg></div>`;
 }
 
-export function initWhatChanged(doc = document, fetcher = fetch) {
+export function initWhatChanged(doc = document, fetcher = seasonFetch) {
   const form = doc.querySelector("#changed-controls");
   if (!form) return;
   let payload = null, view = "top", shown = 20, requestId = 0, selectedId = null;

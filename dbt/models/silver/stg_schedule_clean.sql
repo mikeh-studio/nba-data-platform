@@ -22,7 +22,7 @@ select
             when game_status is null or trim(cast(game_status as {{ varchar_type() }})) = '' then 'scheduled'
             when lower(trim(cast(game_status as {{ varchar_type() }}))) in ('scheduled', 'pre-game', 'tbd') then 'scheduled'
             when regexp_contains(lower(trim(cast(game_status as {{ varchar_type() }}))), r'^[0-9]{1,2}:[0-9]{2}\s*(am|pm)\s*et$') then 'scheduled'
-            when lower(trim(cast(game_status as {{ varchar_type() }}))) in ('final', 'final/ot') then 'final'
+            when lower(trim(cast(game_status as {{ varchar_type() }}))) in ('final', 'final/ot', 'bootstrapped_from_game_logs') then 'final'
             when lower(trim(cast(game_status as {{ varchar_type() }}))) like 'final%' then 'final'
             when lower(trim(cast(game_status as {{ varchar_type() }}))) in ('postponed', 'ppd') then 'postponed'
             else lower(trim(cast(game_status as {{ varchar_type() }})))
@@ -30,7 +30,7 @@ select
     ) as game_status,
     cast(source_updated_at_utc as timestamp) as source_updated_at_utc
 from {{ source('bronze', 'raw_schedule') }}
-where cast(schedule_date as date) between date('2025-07-01') and date('2026-06-30')
+where cast(schedule_date as date) between date('{{ warehouse_season_start() }}') and date('{{ warehouse_season_end() }}')
 {% else %}
 select
     cast(null as {{ varchar_type() }}) as game_id,

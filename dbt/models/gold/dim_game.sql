@@ -65,7 +65,7 @@ select
     home_team_pts,
     away_team_pts,
     cast(null as {{ bool_type() }}) as is_overtime,
-    cast(0 as {{ int64_type() }}) as overtime_periods,
+    cast(null as {{ int64_type() }}) as overtime_periods,
     coalesce(home_team_pts, 0) + coalesce(away_team_pts, 0) as total_points,
     case
         when home_team_pts >= away_team_pts then home_team_pts - away_team_pts

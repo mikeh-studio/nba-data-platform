@@ -13,9 +13,9 @@ with date_spine as (
     {% for offset in range(6, -1, -1) %}
     select
         {% if target.type == 'bigquery' %}
-        date_sub(current_date(), interval {{ offset }} day)
+        date_sub({{ warehouse_today() }}, interval {{ offset }} day)
         {% else %}
-        dateadd(day, -{{ offset }}, current_date)::date
+        dateadd(day, -{{ offset }}, {{ warehouse_today() }})::date
         {% endif %} as as_of_date
     {% if not loop.last %}union all{% endif %}
     {% endfor %}

@@ -3,7 +3,7 @@
     schema=env_var('BQ_DATASET_GOLD', env_var('BQ_DATASET', 'nba_gold'))
 ) }}
 
-{% set today = 'current_date()' if target.type == 'bigquery' else 'current_date' %}
+{% set today = warehouse_today() %}
 
 with recent_form as (
     select

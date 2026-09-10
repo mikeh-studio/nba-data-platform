@@ -1,7 +1,7 @@
 metrics:
   pts:
     label: PTS
-    description: Points per game across qualified 2025-26 players.
+    description: Points per game across qualified players in the selected season.
     aliases: [points, point, ppg, scoring]
     game_log_key: pts
     trend_stat: PTS
@@ -13,7 +13,7 @@ metrics:
     tier: 1
   reb:
     label: REB
-    description: Rebounds per game across qualified 2025-26 players.
+    description: Rebounds per game across qualified players in the selected season.
     aliases: [rebounds, rebound, rbs, boards]
     game_log_key: reb
     trend_stat: REB
@@ -25,7 +25,7 @@ metrics:
     tier: 1
   ast:
     label: AST
-    description: Assists per game across qualified 2025-26 players.
+    description: Assists per game across qualified players in the selected season.
     aliases: [assists, assist, playmaking]
     game_log_key: ast
     trend_stat: AST
@@ -37,7 +37,7 @@ metrics:
     tier: 1
   stl:
     label: STL
-    description: Steals per game across qualified 2025-26 players.
+    description: Steals per game across qualified players in the selected season.
     aliases: [steals, steal]
     game_log_key: stl
     trend_stat: STL
@@ -49,7 +49,7 @@ metrics:
     tier: 2
   blk:
     label: BLK
-    description: Blocks per game across qualified 2025-26 players.
+    description: Blocks per game across qualified players in the selected season.
     aliases: [blocks, block, blcks]
     game_log_key: blk
     trend_stat: BLK
@@ -73,7 +73,7 @@ metrics:
     tier: 2
   fg3m:
     label: 3PM
-    description: Made threes per game across qualified 2025-26 players.
+    description: Made threes per game across qualified players in the selected season.
     aliases: [threes, three_pointers, 3pm, three_point_makes]
     game_log_key: fg3m
     trend_stat: FG3M
@@ -85,7 +85,7 @@ metrics:
     tier: 3
   min:
     label: MIN
-    description: Minutes per game across qualified 2025-26 players.
+    description: Minutes per game across qualified players in the selected season.
     aliases: [minutes, playing_time, mpg]
     game_log_key: min
     trend_stat: MIN

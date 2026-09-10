@@ -80,7 +80,7 @@ with source_data as (
         cast(backcourt_fg_pct as {{ float64_type() }}) as backcourt_fg_pct,
         cast(ingested_at_utc as timestamp) as ingested_at_utc
     from {{ existing_relation }}
-    where cast(season as {{ varchar_type() }}) = '2025-26'
+    where cast(season as {{ varchar_type() }}) = '{{ warehouse_season() }}'
     {% endif %}
 ),
 deduped as (

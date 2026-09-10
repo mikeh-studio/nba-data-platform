@@ -3,7 +3,7 @@
 [![CI](https://github.com/mikeh-studio/nba-stats-desk/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mikeh-studio/nba-stats-desk/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-Agentic, GCP-backed NBA intelligence workbench for the `2025-26` season. It
+Agentic, GCP-backed NBA intelligence workbench covering `2023-24` through `2025-26`. It
 pairs a natural-language `/ask` stats agent that can call the OpenAI API or
 Claude API with Performance insights for recent player form, backed by BigQuery,
 dbt, Airflow, and a Cloud Run-ready FastAPI service.
@@ -77,7 +77,10 @@ when supporting endpoints are unavailable.
 
 ## Warehouse Outputs
 
-The current warehouse is centered on the `2025-26` season.
+The scheduled pipeline remains centered on `2025-26`. The app season selector
+also serves isolated `2023-24` and `2024-25` archives. See
+[Historical seasons](docs/historical-seasons.md) for backfill commands, dataset
+names, validation, and source-coverage limits.
 
 - **Bronze**: raw source tables and operational staging tables.
 - **Silver**: cleaned source models plus enriched player-game rows.

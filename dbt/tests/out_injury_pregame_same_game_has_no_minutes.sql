@@ -21,7 +21,7 @@ with injury_rows as (
         safe_cast(regexp_extract(game_time_et, r'^(\d{1,2}):') as int64) as game_hour_raw,
         safe_cast(regexp_extract(game_time_et, r'^\d{1,2}:(\d{2})') as int64) as game_minute
     from {{ ref('stg_player_injury_reports_clean') }}
-    where season = '2025-26'
+    where season = '{{ warehouse_season() }}'
       and player_id is not null
 ),
 
@@ -69,7 +69,7 @@ played_rows as (
         game_id,
         min
     from {{ ref('fct_player_game_stats') }}
-    where season = '2025-26'
+    where season = '{{ warehouse_season() }}'
       and coalesce(min, 0) > 0
 )
 

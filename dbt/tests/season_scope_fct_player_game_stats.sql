@@ -4,6 +4,6 @@ select
     matchup,
     season
 from {{ ref('fct_player_game_stats') }}
-where season != '2025-26'
-   or game_date < date('2025-07-01')
-   or game_date > date('2026-06-30')
+where season != '{{ warehouse_season() }}'
+   or game_date < date('{{ warehouse_season_start() }}')
+   or game_date > date('{{ warehouse_season_end() }}')

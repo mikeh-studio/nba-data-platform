@@ -11,7 +11,7 @@ from typing import Any
 from google.api_core.exceptions import GoogleAPIError as BQAPIError
 from google.cloud import bigquery
 
-from app.config import SUPPORTED_SEASON, Settings
+from app.config import Settings
 from app.repository._constants import (
     COMPARE_FOCUS_CONFIG,
     RECENT_PERFORMANCE_STAT_CONFIG,
@@ -110,7 +110,7 @@ class BigQueryWarehouseRepository:
         }:
             raise ValueError("Unsupported comparison window or season type")
         params = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
             bigquery.ScalarQueryParameter("season_type", "STRING", season_type),
             bigquery.ScalarQueryParameter("as_of", "DATE", as_of),
         ]
@@ -242,9 +242,15 @@ class BigQueryWarehouseRepository:
                     return [dict(row) for row in rows]
 
         assert self.client is not None
+        table_id = self._recent_performance_table_id()
+        # tabledata.list returns selected columns in physical schema order.
+        # Supply that same order to the decoder, including after dbt rebuilds.
+        table = self.client.get_table(table_id)
+        wanted = {field.name for field in RECENT_PERFORMANCE_TABLE_FIELDS}
+        selected_fields = [field for field in table.schema if field.name in wanted]
         row_iter = self.client.list_rows(
-            self._recent_performance_table_id(),
-            selected_fields=RECENT_PERFORMANCE_TABLE_FIELDS,
+            table_id,
+            selected_fields=selected_fields,
             max_results=RECENT_PERFORMANCE_TABLE_ROW_MAX_RESULTS,
         )
         rows = [
@@ -316,7 +322,7 @@ class BigQueryWarehouseRepository:
         extra_params: list[bigquery.ScalarQueryParameter] | None = None,
     ) -> list[dict[str, Any]]:
         params: list[bigquery.ScalarQueryParameter] = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
             bigquery.ScalarQueryParameter("limit", "INT64", limit),
         ]
         if extra_params:
@@ -377,7 +383,7 @@ class BigQueryWarehouseRepository:
                     sql,
                     [
                         bigquery.ScalarQueryParameter(
-                            "season", "STRING", SUPPORTED_SEASON
+                            "season", "STRING", self.settings.season
                         )
                     ],
                 )
@@ -410,7 +416,7 @@ class BigQueryWarehouseRepository:
     ) -> list[dict[str, Any]]:
         parsed_as_of_date = _parse_iso_date(as_of_date)
         params: list[bigquery.ScalarQueryParameter] = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
             bigquery.ScalarQueryParameter("as_of_date", "DATE", parsed_as_of_date),
             bigquery.ScalarQueryParameter("limit", "INT64", limit),
         ]
@@ -487,7 +493,7 @@ class BigQueryWarehouseRepository:
         LIMIT 1
         """
         params = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
             bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
         ]
         return self._query(sql, params)
@@ -556,7 +562,9 @@ class BigQueryWarehouseRepository:
             return self._query(
                 sql,
                 [
-                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    ),
                     bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
                 ],
             )
@@ -600,7 +608,9 @@ class BigQueryWarehouseRepository:
             rows = self._query(
                 sql,
                 [
-                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    ),
                     bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
                 ],
             )
@@ -688,7 +698,9 @@ class BigQueryWarehouseRepository:
             rows = self._query(
                 sql,
                 [
-                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    ),
                     bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
                     bigquery.ScalarQueryParameter("limit", "INT64", limit),
                 ],
@@ -810,7 +822,7 @@ class BigQueryWarehouseRepository:
         player_id = _to_int(identity.get("player_id"))
         filters = ["season = @season", "player_id = @player_id"]
         params: list[bigquery.ScalarQueryParameter] = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
             bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
             bigquery.ScalarQueryParameter("limit", "INT64", limit),
         ]
@@ -872,7 +884,7 @@ class BigQueryWarehouseRepository:
         return {
             "player_id": player_id,
             "player_name": identity.get("player_name"),
-            "season": SUPPORTED_SEASON,
+            "season": self.settings.season,
             "games": games,
             "games_returned": len(games),
             "limit": limit,
@@ -906,7 +918,9 @@ class BigQueryWarehouseRepository:
             rows = self._query(
                 sql,
                 [
-                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    ),
                     bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
                 ],
             )
@@ -946,7 +960,11 @@ class BigQueryWarehouseRepository:
         try:
             rows = self._query(
                 sql,
-                [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)],
+                [
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    )
+                ],
             )
         except BQAPIError:
             return {}
@@ -954,7 +972,7 @@ class BigQueryWarehouseRepository:
 
     def _fetch_player_detail_row(self, player_id: int) -> dict[str, Any] | None:
         params = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
             bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
         ]
         sql = f"""
@@ -1133,7 +1151,9 @@ class BigQueryWarehouseRepository:
             return self._query(
                 sql,
                 [
-                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    ),
                     bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
                 ],
             )
@@ -1204,7 +1224,7 @@ class BigQueryWarehouseRepository:
             sample = _build_sample_payload(identity)
             return {
                 "player": {
-                    "season": identity.get("latest_season", SUPPORTED_SEASON),
+                    "season": identity.get("latest_season", self.settings.season),
                     "player_id": identity.get("player_id"),
                     "player_name": identity.get("player_name"),
                     "headshot_url": build_headshot_url(identity.get("player_id")),
@@ -1632,11 +1652,15 @@ class BigQueryWarehouseRepository:
         try:
             rows = self._query(
                 sql,
-                [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)],
+                [
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    )
+                ],
             )
         except BQAPIError:
             return {
-                "season": SUPPORTED_SEASON,
+                "season": self.settings.season,
                 "players": [],
                 "archetypes": [],
                 "models": [],
@@ -1649,7 +1673,7 @@ class BigQueryWarehouseRepository:
             rows[0].get("model_evaluation_json") if rows else None
         )
         return {
-            "season": SUPPORTED_SEASON,
+            "season": self.settings.season,
             "players": players,
             "archetypes": self._summarize_map_archetypes(players),
             "models": self._similarity_model_options(players),
@@ -1674,7 +1698,11 @@ class BigQueryWarehouseRepository:
         try:
             rows = self._query(
                 sql,
-                [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)],
+                [
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    )
+                ],
             )
         except BQAPIError:
             return []
@@ -1745,7 +1773,7 @@ class BigQueryWarehouseRepository:
         return self._query(
             sql,
             [
-                bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
                 bigquery.ScalarQueryParameter("limit", "INT64", limit),
             ],
         )
@@ -1762,7 +1790,7 @@ class BigQueryWarehouseRepository:
         table = f"`{self.settings.project_id}.{self.settings.gold_dataset}.fantasy_insights`"
         filters = ["season = @season"]
         params: list[bigquery.ScalarQueryParameter] = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
             bigquery.ScalarQueryParameter("limit", "INT64", limit),
         ]
         if insight_type:
@@ -1831,7 +1859,7 @@ class BigQueryWarehouseRepository:
         LIMIT @limit
         """
         params = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
             bigquery.ScalarQueryParameter("query", "STRING", query.strip()),
             bigquery.ScalarQueryParameter("limit", "INT64", limit),
         ]
@@ -1893,7 +1921,7 @@ class BigQueryWarehouseRepository:
         LIMIT @limit
         """
         params = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
             bigquery.ScalarQueryParameter("limit", "INT64", limit),
         ]
         return self._query(sql, params)
@@ -1956,7 +1984,9 @@ class BigQueryWarehouseRepository:
             return self._query(
                 sql,
                 [
-                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    ),
                     bigquery.ScalarQueryParameter("query", "STRING", query.strip()),
                     bigquery.ScalarQueryParameter("limit", "INT64", limit),
                 ],
@@ -2034,7 +2064,7 @@ class BigQueryWarehouseRepository:
         rows = self._query(
             sql,
             [
-                bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
                 bigquery.ScalarQueryParameter("window", "STRING", window),
                 bigquery.ScalarQueryParameter("player_a_id", "INT64", player_a_id),
                 bigquery.ScalarQueryParameter("player_b_id", "INT64", player_b_id),
@@ -2116,7 +2146,7 @@ class BigQueryWarehouseRepository:
             }
 
         return {
-            "season": SUPPORTED_SEASON,
+            "season": self.settings.season,
             "window": window,
             "window_label": _compare_window_label(window),
             "focus": focus,
@@ -2180,7 +2210,8 @@ class BigQueryWarehouseRepository:
         LIMIT 1
         """
         rows = self._query(
-            sql, [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)]
+            sql,
+            [bigquery.ScalarQueryParameter("season", "STRING", self.settings.season)],
         )
         return build_analysis_payload(rows[0]) if rows else None
 
@@ -2198,7 +2229,8 @@ class BigQueryWarehouseRepository:
         LIMIT 1
         """
         rows = self._query(
-            sql, [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)]
+            sql,
+            [bigquery.ScalarQueryParameter("season", "STRING", self.settings.season)],
         )
         return rows[0] if rows else None
 
@@ -2218,11 +2250,17 @@ class BigQueryWarehouseRepository:
         try:
             rows = self._query(
                 sql,
-                [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)],
+                [
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    )
+                ],
             )
         except BQAPIError:
             return None
-        return build_season_coverage_payload(rows[0] if rows else None)
+        return build_season_coverage_payload(
+            rows[0] if rows else None, season=self.settings.season
+        )
 
     def get_player_game_log(
         self,
@@ -2278,7 +2316,7 @@ class BigQueryWarehouseRepository:
             else (dates[0]["value"] if dates else None)
         )
         return {
-            "season": SUPPORTED_SEASON,
+            "season": self.settings.season,
             "dates": dates,
             "selected_date": selected_date,
             "selected_game_id": game_id,
@@ -2294,7 +2332,7 @@ class BigQueryWarehouseRepository:
         game_id: str | None,
         limit: int,
     ) -> dict[str, Any]:
-        season_rows = [row for row in rows if row.get("season") == SUPPORTED_SEASON]
+        season_rows = [row for row in rows if row.get("season") == self.settings.season]
         date_values = sorted(
             {
                 str(row["game_date"])
@@ -2314,7 +2352,7 @@ class BigQueryWarehouseRepository:
         )
         if selected_date is None:
             return {
-                "season": SUPPORTED_SEASON,
+                "season": self.settings.season,
                 "dates": dates,
                 "selected_date": None,
                 "selected_game_id": game_id,
@@ -2371,7 +2409,7 @@ class BigQueryWarehouseRepository:
         )[:limit]
         players = [_format_recent_performance_row(row) for row in player_rows]
         return {
-            "season": SUPPORTED_SEASON,
+            "season": self.settings.season,
             "dates": dates,
             "selected_date": selected_date,
             "selected_game_id": game_id,
@@ -2410,7 +2448,7 @@ class BigQueryWarehouseRepository:
         )
         game_filter = ""
         params: list[bigquery.ScalarQueryParameter] = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
             bigquery.ScalarQueryParameter("limit", "INT64", limit),
         ]
         if parsed_game_date is not None:
@@ -2580,7 +2618,7 @@ class BigQueryWarehouseRepository:
         parsed_game_date = _parse_iso_date(game_date)
         if game_date is not None and parsed_game_date is None:
             return {
-                "season": SUPPORTED_SEASON,
+                "season": self.settings.season,
                 "dates": [],
                 "selected_date": None,
                 "selected_game_id": game_id,
@@ -2611,7 +2649,7 @@ class BigQueryWarehouseRepository:
         )
         game_filter = ""
         params: list[bigquery.ScalarQueryParameter] = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
             bigquery.ScalarQueryParameter("limit", "INT64", limit),
         ]
         if parsed_game_date is not None:
@@ -2933,7 +2971,7 @@ class BigQueryWarehouseRepository:
             rows = self._query(sql, params)
         except BQAPIError:
             return {
-                "season": SUPPORTED_SEASON,
+                "season": self.settings.season,
                 "dates": [],
                 "selected_date": None,
                 "selected_game_id": game_id,
@@ -2960,7 +2998,11 @@ class BigQueryWarehouseRepository:
         try:
             rows = self._query(
                 sql,
-                [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)],
+                [
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    )
+                ],
             )
         except BQAPIError:
             return []
@@ -2982,7 +3024,7 @@ class BigQueryWarehouseRepository:
             "COALESCE(SAFE_CAST(stats.min AS FLOAT64), 0) >= 1",
         ]
         params: list[bigquery.ScalarQueryParameter] = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season)
         ]
         parsed_game_date = _parse_iso_date(game_date)
         if parsed_game_date is not None:
@@ -3049,7 +3091,7 @@ class BigQueryWarehouseRepository:
             "COALESCE(SAFE_CAST(s.min AS FLOAT64), 0) >= 1",
         ]
         params: list[bigquery.ScalarQueryParameter] = [
-            bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
             bigquery.ScalarQueryParameter("game_date", "DATE", parsed_game_date),
             bigquery.ScalarQueryParameter("limit", "INT64", limit),
         ]
@@ -3282,7 +3324,9 @@ class BigQueryWarehouseRepository:
             rows = self._query(
                 sql,
                 [
-                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    ),
                     bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
                     bigquery.ScalarQueryParameter("game_id", "STRING", game_id),
                 ],
@@ -3321,7 +3365,7 @@ class BigQueryWarehouseRepository:
         if rows is None:
             return None
         for row in rows:
-            if row.get("season") != SUPPORTED_SEASON:
+            if row.get("season") != self.settings.season:
                 continue
             if _to_int(row.get("player_id")) != player_id:
                 continue
@@ -3344,7 +3388,7 @@ class BigQueryWarehouseRepository:
         rows = self._query(
             sql,
             [
-                bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
                 bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
                 bigquery.ScalarQueryParameter("game_id", "STRING", game_id),
             ],
@@ -3618,7 +3662,9 @@ class BigQueryWarehouseRepository:
             rows = self._query(
                 sql,
                 [
-                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    ),
                     bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
                     bigquery.ScalarQueryParameter("game_id", "STRING", game_id),
                 ],
@@ -3662,7 +3708,9 @@ class BigQueryWarehouseRepository:
             rows = self._query(
                 sql,
                 [
-                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    ),
                     bigquery.ScalarQueryParameter("metric_key", "STRING", metric),
                     bigquery.ScalarQueryParameter(
                         "metric_label", "STRING", config["label"]
@@ -3699,7 +3747,7 @@ class BigQueryWarehouseRepository:
                     legacy_sql,
                     [
                         bigquery.ScalarQueryParameter(
-                            "season", "STRING", SUPPORTED_SEASON
+                            "season", "STRING", self.settings.season
                         ),
                         bigquery.ScalarQueryParameter("metric_key", "STRING", metric),
                         bigquery.ScalarQueryParameter(
@@ -3807,7 +3855,9 @@ class BigQueryWarehouseRepository:
             rows = self._query(
                 sql,
                 [
-                    bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON),
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    ),
                     bigquery.ScalarQueryParameter("player_id", "INT64", player_id),
                     bigquery.ScalarQueryParameter("metric_key", "STRING", metric),
                     bigquery.ScalarQueryParameter(
@@ -3883,7 +3933,11 @@ class BigQueryWarehouseRepository:
         try:
             return self._query(
                 sql,
-                [bigquery.ScalarQueryParameter("season", "STRING", SUPPORTED_SEASON)],
+                [
+                    bigquery.ScalarQueryParameter(
+                        "season", "STRING", self.settings.season
+                    )
+                ],
             )
         except BQAPIError:
             return None
@@ -3891,6 +3945,53 @@ class BigQueryWarehouseRepository:
     def get_health(self) -> dict[str, Any]:
         from app.freshness import build_publication_health
 
+        if self.settings.season != "2025-26":
+            table = f"`{self.settings.project_id}.{self.settings.metadata_dataset}.historical_backfill_manifest`"
+            try:
+                rows = self._query(
+                    f"SELECT published_at_utc, as_of_date, report_json FROM {table} WHERE season = @season LIMIT 1",
+                    [
+                        bigquery.ScalarQueryParameter(
+                            "season", "STRING", self.settings.season
+                        )
+                    ],
+                )
+            except BQAPIError:
+                rows = []
+            publication = rows[0] if rows else {}
+            archive_report = json.loads(publication.get("report_json") or "{}")
+            names = ["stats", "similarity"]
+            if archive_report.get("row_counts", {}).get("injury_reports", 0):
+                names.append("injuries")
+            assets = (
+                [
+                    {
+                        "asset": name,
+                        "last_successful_finished_at_utc": publication.get(
+                            "published_at_utc"
+                        ),
+                        "latest_source_date": archive_report.get(
+                            "injury_coverage", {}
+                        ).get("latest_report_date")
+                        if name == "injuries"
+                        else publication.get("as_of_date"),
+                        "last_attempt_status": "success",
+                    }
+                    for name in names
+                ]
+                if publication
+                else []
+            )
+            health = build_publication_health(
+                None,
+                assets,
+                self.get_season_coverage(),
+                settings=self.settings,
+                now=datetime.now(tz=UTC),
+            )
+            health["data_limitations"] = archive_report.get("limitations", [])
+            health["injury_coverage"] = archive_report.get("injury_coverage")
+            return health
         return build_publication_health(
             self.get_latest_successful_run(),
             self.get_asset_publication_history(),

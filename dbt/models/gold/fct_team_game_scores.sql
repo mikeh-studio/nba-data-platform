@@ -54,7 +54,11 @@ line_team_scores as (
                 then p.player_team_pts
             else l.pts
         end as team_pts,
-        (
+        case when l.pts_ot1 is null and l.pts_ot2 is null
+            and l.pts_ot3 is null and l.pts_ot4 is null and l.pts_ot5 is null
+            and l.pts_ot6 is null and l.pts_ot7 is null and l.pts_ot8 is null
+            and l.pts_ot9 is null and l.pts_ot10 is null then null
+        else (
             coalesce(l.pts_ot1, 0)
             + coalesce(l.pts_ot2, 0)
             + coalesce(l.pts_ot3, 0)
@@ -65,7 +69,7 @@ line_team_scores as (
             + coalesce(l.pts_ot8, 0)
             + coalesce(l.pts_ot9, 0)
             + coalesce(l.pts_ot10, 0)
-        ) as team_pts_ot_total,
+        ) end as team_pts_ot_total,
         l.ingested_at_utc
     from line_scores l
     left join player_team_context p

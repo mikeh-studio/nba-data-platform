@@ -6,7 +6,7 @@ from datetime import datetime, time, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
 
-from app.config import SUPPORTED_SEASON, Settings
+from app.config import Settings
 from app.repository._helpers import _parse_iso_datetime, build_freshness_payload
 
 ASSET_LABELS = {"stats": "Stats", "injuries": "Injuries", "similarity": "Similarity"}
@@ -88,7 +88,7 @@ def build_publication_health(
 
     payload.update(
         {
-            "season": SUPPORTED_SEASON,
+            "season": settings.season,
             "season_phase": "offseason" if offseason else "in_season",
             "updates_expected": not offseason,
             "next_regular_season_start": settings.next_regular_season_start.isoformat(),
@@ -115,4 +115,20 @@ def build_publication_health(
         payload.update(
             status="partially_updated" if latest_run else "missing", is_fresh=False
         )
+    if settings.season != "2025-26":
+        payload.update(
+            status="historical" if coverage else "missing",
+            is_fresh=None,
+            season_phase="historical",
+            updates_expected=False,
+            next_regular_season_start=None,
+        )
+        for name, asset in assets.items():
+            asset.update(
+                status="historical"
+                if (name == "stats" and coverage)
+                or asset.get("last_successful_finished_at_utc")
+                else "unavailable",
+                is_fresh=None,
+            )
     return payload

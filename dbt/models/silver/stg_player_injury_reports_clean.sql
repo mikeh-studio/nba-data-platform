@@ -41,8 +41,8 @@ with source as (
         cast(source_system as {{ varchar_type() }}) as source_system,
         cast(ingested_at_utc as timestamp) as ingested_at_utc
     from {{ source('bronze', 'raw_player_injury_reports') }}
-    where cast(report_date as date) between date('2025-07-01') and date('2026-06-30')
-      and cast(game_date as date) between date('2025-07-01') and date('2026-06-30')
+    where cast(report_date as date) between date('{{ warehouse_season_start() }}') and date('{{ warehouse_season_end() }}')
+      and cast(game_date as date) between date('{{ warehouse_season_start() }}') and date('{{ warehouse_season_end() }}')
 ),
 deduped as (
     select

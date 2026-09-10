@@ -1,3 +1,4 @@
+import { seasonFetch, selectedSeason } from "./season.js";
 function escHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -6,7 +7,7 @@ function escHtml(value) {
     .replace(/"/g, "&quot;");
 }
 
-const HISTORY_STORAGE_KEY = "askChatHistory:v1";
+const HISTORY_STORAGE_KEY = selectedSeason() === "2025-26" ? "askChatHistory:v1" : `askChatHistory:v1:${selectedSeason()}`;
 const HISTORY_CONVERSATION_CAP = 25;
 const HISTORY_TURN_CAP = 20;
 
@@ -965,7 +966,7 @@ async function clearHistory() {
   startNewChat();
   renderHistoryList();
   try {
-    await fetch("/api/agent/history", { method: "DELETE" });
+    await seasonFetch("/api/agent/history", { method: "DELETE" });
   } catch {
     // Server-local history is best effort and should not block the UI.
   }
@@ -973,7 +974,7 @@ async function clearHistory() {
 
 async function loadServerHistory() {
   try {
-    const response = await fetch("/api/agent/history?limit=25");
+    const response = await seasonFetch("/api/agent/history?limit=25");
     if (!response.ok) return;
     const payload = await response.json();
     const merged = mergeHistoryConversations(payload.conversations);
@@ -1160,7 +1161,7 @@ function buildAskBody(question, selection) {
 
 async function askQuestionJson(question, selection) {
   const statusEl = document.querySelector("[data-agent-status]");
-  const response = await fetch("/api/agent/ask", {
+  const response = await seasonFetch("/api/agent/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(buildAskBody(question, selection)),
@@ -1216,7 +1217,7 @@ function renderAskFailure(message, statusText) {
 }
 
 async function askQuestionStream(question, selection) {
-  const response = await fetch("/api/agent/ask/stream", {
+  const response = await seasonFetch("/api/agent/ask/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(buildAskBody(question, selection)),

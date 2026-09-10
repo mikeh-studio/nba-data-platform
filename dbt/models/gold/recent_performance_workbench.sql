@@ -11,7 +11,7 @@ with playoff_games as (
         stats.game_id,
         stats.game_date
     from {{ ref('fct_player_game_stats') }} stats
-    where stats.season = '2025-26'
+    where stats.season = '{{ warehouse_season() }}'
       and stats.season_type = 'Playoffs'
       and coalesce(cast(stats.min as {{ float64_type() }}), 0) >= 1
 ),
@@ -180,7 +180,7 @@ baseline as (
         approx_quantiles(stats.fg_pct, 100)[offset(75)] as fg_pct_p75,
         approx_quantiles(stats.fg_pct, 100)[offset(90)] as fg_pct_p90,
         case
-            when selected_players.fg_pct is null then null
+            when max(selected_players.fg_pct) is null then null
             else round(
                 {{ safe_divide(
                     'countif(stats.fg_pct < selected_players.fg_pct) + 0.5 * countif(stats.fg_pct = selected_players.fg_pct)',
@@ -195,7 +195,7 @@ baseline as (
         approx_quantiles(stats.ft_pct, 100)[offset(75)] as ft_pct_p75,
         approx_quantiles(stats.ft_pct, 100)[offset(90)] as ft_pct_p90,
         case
-            when selected_players.ft_pct is null then null
+            when max(selected_players.ft_pct) is null then null
             else round(
                 {{ safe_divide(
                     'countif(stats.ft_pct < selected_players.ft_pct) + 0.5 * countif(stats.ft_pct = selected_players.ft_pct)',

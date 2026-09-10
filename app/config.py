@@ -61,6 +61,7 @@ class Settings:
     metadata_dataset: str
     freshness_threshold_hours: int
     max_search_results: int
+    season: str = SUPPORTED_SEASON
     agent_dataset: str = "nba_agent"
     openai_api_key: str | None = None
     openai_agent_model: str = "gpt-5.4-mini"

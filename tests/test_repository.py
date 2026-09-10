@@ -4,6 +4,7 @@ import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from google.api_core.exceptions import BadRequest
@@ -19,6 +20,7 @@ from app.repository import (
     build_freshness_payload,
     build_season_coverage_payload,
 )
+from app.repository._constants import RECENT_PERFORMANCE_TABLE_FIELDS
 
 
 def _build_repository() -> BigQueryWarehouseRepository:
@@ -531,7 +533,7 @@ def test_get_recent_performance_initial_uses_table_rows_api(
 
     class FakeClient:
         def get_table(self, table_id):
-            pytest.fail("list_rows should use selected_fields instead of get_table")
+            return SimpleNamespace(schema=RECENT_PERFORMANCE_TABLE_FIELDS)
 
         def list_rows(self, table, selected_fields, max_results):
             assert table == "local-project.nba_gold.recent_performance_workbench"
@@ -692,6 +694,9 @@ def test_recent_performance_table_rows_cache_feeds_initial_and_detail(
     class FakeClient:
         calls = 0
 
+        def get_table(self, table_id):
+            return SimpleNamespace(schema=RECENT_PERFORMANCE_TABLE_FIELDS)
+
         def list_rows(self, table, selected_fields, max_results):
             self.calls += 1
             assert table == "local-project.nba_gold.recent_performance_workbench"
@@ -830,6 +835,9 @@ def test_recent_performance_truncated_table_rows_fall_back_to_query(
         total_rows = 9000
 
     class FakeClient:
+        def get_table(self, table_id):
+            return SimpleNamespace(schema=RECENT_PERFORMANCE_TABLE_FIELDS)
+
         def list_rows(self, table, selected_fields, max_results):
             return TruncatedRowIterator()
 

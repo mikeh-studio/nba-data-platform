@@ -1,3 +1,4 @@
+import { seasonFetch } from "./season.js";
 (function () {
   "use strict";
 
@@ -402,7 +403,7 @@
       searchInput.value = match.player_name || "";
     }
 
-    fetch("/api/similarity-map/neighbors/" + encodeURIComponent(playerId))
+    seasonFetch("/api/similarity-map/neighbors/" + encodeURIComponent(playerId))
       .then((response) => {
         if (!response.ok) {
           throw new Error("Request failed: " + response.status);
@@ -624,7 +625,7 @@
       setMeta("Unavailable");
       return;
     }
-    fetch("/api/similarity-map")
+    seasonFetch("/api/similarity-map")
       .then((response) => {
         if (!response.ok) {
           throw new Error("Request failed: " + response.status);

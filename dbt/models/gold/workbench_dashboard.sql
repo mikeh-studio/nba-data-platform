@@ -4,7 +4,7 @@
 ) }}
 
 {% set empty_string = "''" if target.type == 'bigquery' else "''" %}
-{% set today = 'current_date()' if target.type == 'bigquery' else 'current_date' %}
+{% set today = warehouse_today() %}
 
 with rankings as (
     select

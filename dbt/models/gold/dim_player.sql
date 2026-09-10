@@ -74,7 +74,7 @@ select
     p.draft_year,
     p.draft_round,
     p.draft_number,
-    '2025-26' as latest_season,
+    '{{ warehouse_season() }}' as latest_season,
     coalesce(s.last_seen_at_utc, p.ingested_at_utc) as last_seen_at_utc,
     p.ingested_at_utc as last_profile_refresh_at_utc
 from latest_profile p

@@ -1,3 +1,4 @@
+import { seasonFetch, withSeason } from "./season.js";
 function escHtml(str) {
   return String(str ?? "")
     .replace(/&/g, "&amp;")
@@ -170,6 +171,8 @@ export function formatHealthStatusText(payload, format = "default") {
   let text = "Data status unavailable";
   if (status === "partially_updated") {
     text = "Partially updated — check data sources";
+  } else if (status === "historical") {
+    text = "Historical season archive";
   } else if (status === "offseason") {
     text = "Offseason — waiting for regular-season games";
   } else if (status === "awaiting_refresh") {
@@ -198,7 +201,7 @@ function formatPublicationDate(value, includeTime = false) {
 
 export function formatAssetHealthText(asset) {
   const state = {
-    fresh: "Current", stale: "Update overdue", offseason: "Offseason archive",
+    historical: "Historical archive", fresh: "Current", stale: "Update overdue", offseason: "Offseason archive",
     awaiting_refresh: "Awaiting first refresh", missing: "No publication recorded",
     unavailable: "Status unavailable", refresh_failed: "Refresh failed",
   }[asset?.status] || "Status unknown";
@@ -249,7 +252,7 @@ async function setupHealthStatus() {
     node.classList.add("loading");
   });
   try {
-    const response = await fetch("/api/health", { cache: "default" });
+    const response = await seasonFetch("/api/health", { cache: "default" });
     if (!response.ok) {
       throw new Error("health unavailable");
     }
@@ -257,7 +260,9 @@ async function setupHealthStatus() {
     nodes.forEach((node) => renderHealthStatus(node, payload));
     document.querySelectorAll("[data-publication-health]").forEach((panel) => {
       const seasonNode = panel.querySelector("[data-health-season]");
-      seasonNode.textContent = payload.season_phase === "offseason"
+      seasonNode.textContent = payload.season_phase === "historical"
+        ? `Archived ${payload.season} season. Missing source data remains unavailable; no daily updates are expected.`
+        : payload.season_phase === "offseason"
         ? `No new data is expected until the regular season starts on ${formatPublicationDate(payload.next_regular_season_start)}. Preseason and Summer League are excluded.`
         : `Showing season ${payload.season}. Freshness tracks publication time and source data separately.`;
       const list = panel.querySelector("[data-health-assets]");
@@ -321,7 +326,7 @@ function hydrateTrackedCard(item) {
 }
 
 async function fetchTrackedPlayer(playerId) {
-  const response = await fetch(`/api/players/${playerId}`);
+  const response = await seasonFetch(`/api/players/${playerId}`);
   if (!response.ok) {
     return {
       item: {
@@ -441,7 +446,7 @@ function setupCompareSearch() {
       }
       message.textContent = "";
       try {
-        const response = await fetch(`/api/players/search?q=${encodeURIComponent(query)}`);
+        const response = await seasonFetch(`/api/players/search?q=${encodeURIComponent(query)}`);
         const data = await response.json();
         if (!response.ok) {
           message.textContent = data.detail || "Search failed";
@@ -452,12 +457,12 @@ function setupCompareSearch() {
           return;
         }
         const playerBId = data.items[0].player_id;
-        globalThis.location.href = buildCompareHref(
+        globalThis.location.href = withSeason(buildCompareHref(
           playerAId,
           playerBId,
           windowSelect.value,
           focusSelect.value
-        );
+        ));
       } catch {
         message.textContent = "Search failed";
       }
@@ -467,7 +472,7 @@ function setupCompareSearch() {
 
 async function doComparePlayerASearch(query, resultsEl) {
   try {
-    const resp = await fetch(`/api/players/search?q=${encodeURIComponent(query)}`);
+    const resp = await seasonFetch(`/api/players/search?q=${encodeURIComponent(query)}`);
     if (!resp.ok) return;
     const data = await resp.json();
     if (!data.items || data.items.length === 0) {
@@ -487,7 +492,7 @@ async function doComparePlayerASearch(query, resultsEl) {
     resultsEl.hidden = false;
     resultsEl.querySelectorAll(".viz-search-result[data-player-id]").forEach((btn) => {
       btn.addEventListener("click", () => {
-        globalThis.location.href = `/compare?player_a_id=${btn.dataset.playerId}`;
+        globalThis.location.href = withSeason(`/compare?player_a_id=${btn.dataset.playerId}`);
       });
     });
   } catch {
@@ -540,7 +545,7 @@ async function runQualifiedPlayerSearch(formNode, query, { navigateFirst = false
     return;
   }
   try {
-    const response = await fetch(`/api/players/search?q=${encodeURIComponent(query)}`);
+    const response = await seasonFetch(`/api/players/search?q=${encodeURIComponent(query)}`);
     const data = await response.json();
     if (!response.ok) {
       resultsEl.innerHTML = `<div class="empty-state"><strong>${escHtml(data.detail || "Search failed")}</strong></div>`;
@@ -549,7 +554,7 @@ async function runQualifiedPlayerSearch(formNode, query, { navigateFirst = false
     }
     const items = Array.isArray(data.items) ? data.items : [];
     if (navigateFirst && items[0]) {
-      globalThis.location.href = `/players/${items[0].player_id}`;
+      globalThis.location.href = withSeason(`/players/${items[0].player_id}`);
       return;
     }
     if (items.length === 0) {
@@ -561,7 +566,7 @@ async function runQualifiedPlayerSearch(formNode, query, { navigateFirst = false
     resultsEl.hidden = false;
     resultsEl.querySelectorAll("[data-player-id]").forEach((button) => {
       button.addEventListener("click", () => {
-        globalThis.location.href = `/players/${button.dataset.playerId}`;
+        globalThis.location.href = withSeason(`/players/${button.dataset.playerId}`);
       });
     });
   } catch {

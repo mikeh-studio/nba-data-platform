@@ -950,7 +950,13 @@
                 <div class="player-search-results" data-player-search-results hidden></div>
               </div>
             </form>
-            <span class="season-tag">Season {{ season }}</span>
+            <label class="season-tag" for="season-selector">Season
+              <select id="season-selector" data-season-selector aria-label="NBA season" style="font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 4px;">
+                {% for option in available_seasons %}
+                <option value="{{ option }}" {% if option == season %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </label>
           </div>
         </nav>
         <details class="publication-health" data-publication-health>

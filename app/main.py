@@ -17,6 +17,7 @@ from uuid import uuid4
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import (
     HTMLResponse,
+    JSONResponse,
     RedirectResponse,
     Response,
     StreamingResponse,
@@ -32,7 +33,6 @@ from app.agent.service import AgentDisabledError, AgentExecutionError, StatsAgen
 from app.config import (
     AGENT_MODEL_OPTIONS,
     AGENT_MODEL_VALUES,
-    SUPPORTED_SEASON,
     Settings,
     get_settings,
 )
@@ -45,13 +45,21 @@ from app.repository import (
     get_compare_focus_options,
     get_compare_window_options,
 )
+from app.seasons import (
+    SEASONS,
+    _selected_season,
+    current_season,
+    settings_for_season,
+    validate_season,
+)
 from app.telemetry import instrument_compare_view, instrument_player_view
 from app.what_changed import ComparisonPeriod, SeasonPhase, WhatChangedUnavailable
 
 BASE_DIR = Path(__file__).resolve().parent
-STATIC_VERSION = "20260905-sports-journal-v2"
+STATIC_VERSION = "20260909-season-selector-v1"
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["static_version"] = STATIC_VERSION
+templates.env.globals["available_seasons"] = SEASONS
 TRACKING_CAP = 8
 HEALTH_CACHE_TTL_SECONDS = 60
 PERFORMANCE_CACHE_TTL_SECONDS = 900
@@ -161,13 +169,26 @@ async def _lifespan(_: FastAPI):
     yield
 
 
-app = FastAPI(title="NBA 2025-26 Public API", version="1.0.0", lifespan=_lifespan)
+app = FastAPI(title="NBA Stats Desk Public API", version="1.0.0", lifespan=_lifespan)
 app.mount(
     "/static",
     CacheControlledStaticFiles(directory=str(BASE_DIR / "static")),
     name="static",
 )
 agent_logger = logging.getLogger(LOGGER_NAME)
+
+
+@app.middleware("http")
+async def select_season(request: Request, call_next):
+    try:
+        season = validate_season(request.query_params.get("season", "2025-26"))
+    except ValueError as exc:
+        return JSONResponse(status_code=422, content={"detail": str(exc)})
+    token = _selected_season.set(season)
+    try:
+        return await call_next(request)
+    finally:
+        _selected_season.reset(token)
 
 
 def _dependency_override_value(callable_: Any) -> Any | None:
@@ -185,7 +206,7 @@ def _cached_repository(settings: Settings) -> BigQueryWarehouseRepository:
 def get_repository(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> WarehouseRepository:
-    return _cached_repository(settings)
+    return _cached_repository(settings_for_season(settings, current_season()))
 
 
 def get_agent_client() -> Any | None:
@@ -402,16 +423,25 @@ def _fail_trace(trace: AgentTrace, exc: Exception) -> None:
     trace.error_type = type(exc).__name__
 
 
+@lru_cache(maxsize=3)
+def _season_conversation_store(season: str):
+    if season == "2025-26":
+        return get_conversation_store()
+    from app.agent.conversation import InMemoryConversationStore
+
+    return InMemoryConversationStore()
+
+
 def _build_stats_agent(
     settings: Settings,
     repo: WarehouseRepository,
     agent_client: Any | None,
 ) -> StatsAgent:
     return StatsAgent(
-        settings,
+        settings_for_season(settings, current_season()),
         repo,
         client=agent_client,
-        conversation_store=get_conversation_store(),
+        conversation_store=_season_conversation_store(current_season()),
     )
 
 
@@ -461,7 +491,7 @@ def _record_agent_history(
     if not settings.agent_history_enabled:
         return
     append_history_turn(
-        settings.agent_history_path,
+        settings_for_season(settings, current_season()).agent_history_path,
         conversation_id=conversation_id,
         request_id=request_id,
         question=question,
@@ -475,19 +505,19 @@ def _record_agent_history(
 def api_leaderboard(
     repo: Annotated[WarehouseRepository, Depends(get_repository)],
 ) -> dict:
-    return {"season": SUPPORTED_SEASON, "items": repo.get_leaderboard()}
+    return {"season": current_season(), "items": repo.get_leaderboard()}
 
 
 @app.get("/api/trends")
 def api_trends(repo: Annotated[WarehouseRepository, Depends(get_repository)]) -> dict:
-    return {"season": SUPPORTED_SEASON, "items": repo.get_trends()}
+    return {"season": current_season(), "items": repo.get_trends()}
 
 
 @app.get("/api/analysis/latest")
 def api_analysis_latest(
     repo: Annotated[WarehouseRepository, Depends(get_repository)],
 ) -> dict:
-    return {"season": SUPPORTED_SEASON, "item": repo.get_latest_analysis()}
+    return {"season": current_season(), "item": repo.get_latest_analysis()}
 
 
 @app.get("/api/recommendations")
@@ -497,7 +527,7 @@ def api_recommendations(
     insight_type: str | None = Query(default=None),
 ) -> dict:
     return {
-        "season": SUPPORTED_SEASON,
+        "season": current_season(),
         "items": repo.get_recommendations(limit=limit, insight_type=insight_type),
     }
 
@@ -507,7 +537,7 @@ def api_rankings(
     repo: Annotated[WarehouseRepository, Depends(get_repository)],
     limit: int = Query(25, ge=1, le=100),
 ) -> dict:
-    return {"season": SUPPORTED_SEASON, "items": repo.get_rankings(limit=limit)}
+    return {"season": current_season(), "items": repo.get_rankings(limit=limit)}
 
 
 @app.get("/api/players/search")
@@ -520,7 +550,7 @@ def api_player_search(
     if not query:
         raise HTTPException(status_code=400, detail="Search query must not be blank")
     return {
-        "season": SUPPORTED_SEASON,
+        "season": current_season(),
         "query": query,
         "items": repo.search_players(query, limit=settings.max_search_results),
     }
@@ -534,7 +564,7 @@ def api_player_detail(
     detail = _get_cached_player_detail(repo, player_id)
     if detail is None:
         raise HTTPException(status_code=404, detail="Player not found")
-    return {"season": SUPPORTED_SEASON, "item": detail}
+    return {"season": current_season(), "item": detail}
 
 
 @app.get("/api/compare")
@@ -565,7 +595,11 @@ def api_health(
 
 @app.get("/", response_class=RedirectResponse)
 def home() -> RedirectResponse:
-    return RedirectResponse(url="/ask")
+    return RedirectResponse(
+        url="/ask"
+        if current_season() == "2025-26"
+        else f"/ask?season={current_season()}"
+    )
 
 
 @app.get("/players/{player_id}", response_class=HTMLResponse)
@@ -579,13 +613,13 @@ def player_page(
         raise HTTPException(status_code=404, detail="Player not found")
     instrument_player_view(
         route="/players/{player_id}",
-        season=SUPPORTED_SEASON,
+        season=current_season(),
         player_detail=player_detail,
     )
     context = {
         "request": request,
         "page_title": f"{player_detail['player']['player_name']} Stats Outlook",
-        "season": SUPPORTED_SEASON,
+        "season": current_season(),
         "player_detail": player_detail,
         "tracking_cap": TRACKING_CAP,
     }
@@ -613,7 +647,7 @@ def api_player_game_log(
     )
     if result is None:
         raise HTTPException(status_code=404, detail="Player not found")
-    return {"season": SUPPORTED_SEASON, "item": result}
+    return {"season": current_season(), "item": result}
 
 
 def _build_performance_initial_payload(
@@ -707,7 +741,7 @@ def api_performance_dates(
         (_repo_cache_token(repo), "performance_dates"),
         PERFORMANCE_CACHE_TTL_SECONDS,
         lambda: {
-            "season": SUPPORTED_SEASON,
+            "season": current_season(),
             "items": repo.get_recent_performance_dates(),
         },
         stale_ttl_seconds=PERFORMANCE_STALE_TTL_SECONDS,
@@ -726,7 +760,7 @@ def api_performance_games(
         (_repo_cache_token(repo), "performance_games", game_date_value),
         PERFORMANCE_CACHE_TTL_SECONDS,
         lambda: {
-            "season": SUPPORTED_SEASON,
+            "season": current_season(),
             "game_date": game_date_value,
             "items": repo.get_recent_performance_games(game_date=game_date_value),
         },
@@ -754,7 +788,7 @@ def api_performance_players(
         ),
         PERFORMANCE_CACHE_TTL_SECONDS,
         lambda: {
-            "season": SUPPORTED_SEASON,
+            "season": current_season(),
             "game_date": game_date_value,
             "game_id": game_id,
             "items": repo.get_recent_performance_players(
@@ -783,7 +817,7 @@ def api_performance_player_detail(
     )
     if item is None:
         raise HTTPException(status_code=404, detail="Performance row not found")
-    return {"season": SUPPORTED_SEASON, "item": item}
+    return {"season": current_season(), "item": item}
 
 
 @app.post("/api/agent/ask")
@@ -828,7 +862,7 @@ def api_agent_ask(
         trace.emit()
     answer.pop("answer_streamed", None)
     response.headers["X-Request-ID"] = request_id
-    final_payload = {"season": SUPPORTED_SEASON, "request_id": request_id, **answer}
+    final_payload = {"season": current_season(), "request_id": request_id, **answer}
     _record_agent_history(
         settings,
         request_id=request_id,
@@ -872,7 +906,7 @@ def api_agent_ask_stream(
                     model=payload.model,
                 )
                 answer["request_id"] = request_id
-                answer["season"] = SUPPORTED_SEASON
+                answer["season"] = current_season()
                 if not answer.pop("answer_streamed", False):
                     # Fallback for paths that did not stream real deltas
                     # (OpenAI provider, tool-loop answers). Preserve Markdown
@@ -943,7 +977,9 @@ def api_agent_history(
 ) -> dict:
     if not settings.agent_history_enabled:
         return {"conversations": []}
-    return read_history(settings.agent_history_path, limit=limit)
+    return read_history(
+        settings_for_season(settings, current_season()).agent_history_path, limit=limit
+    )
 
 
 @app.delete("/api/agent/history")
@@ -951,7 +987,9 @@ def api_agent_history_clear(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> dict:
     if settings.agent_history_enabled:
-        clear_history(settings.agent_history_path)
+        clear_history(
+            settings_for_season(settings, current_season()).agent_history_path
+        )
     return {"status": "ok"}
 
 
@@ -963,7 +1001,7 @@ def ask_page(
     context = {
         "request": request,
         "page_title": "Ask NBA Stats",
-        "season": SUPPORTED_SEASON,
+        "season": current_season(),
         "tracking_cap": TRACKING_CAP,
         "agent_enabled": settings.openai_agent_enabled,
         "agent_configured": bool(settings.openai_api_key or settings.anthropic_api_key),
@@ -978,7 +1016,11 @@ def ask_page(
 
 @app.get("/visualize", response_class=RedirectResponse)
 def visualize_page() -> RedirectResponse:
-    return RedirectResponse(url="/performance")
+    return RedirectResponse(
+        url="/performance"
+        if current_season() == "2025-26"
+        else f"/performance?season={current_season()}"
+    )
 
 
 @app.get("/performance", response_class=HTMLResponse)
@@ -988,7 +1030,7 @@ def performance_page(
     context = {
         "request": request,
         "page_title": "Player Trends",
-        "season": SUPPORTED_SEASON,
+        "season": current_season(),
         "tracking_cap": TRACKING_CAP,
     }
     return templates.TemplateResponse(request, "performance.html", context)
@@ -1002,7 +1044,7 @@ def what_changed_page(request: Request) -> HTMLResponse:
         {
             "request": request,
             "page_title": "What Changed?",
-            "season": SUPPORTED_SEASON,
+            "season": current_season(),
         },
     )
 
@@ -1056,7 +1098,7 @@ def similarity_map_page(
     context = {
         "request": request,
         "page_title": "Similar Players",
-        "season": SUPPORTED_SEASON,
+        "season": current_season(),
     }
     return templates.TemplateResponse(request, "similarity_map.html", context)
 
@@ -1090,14 +1132,14 @@ def compare_page(
             )
     instrument_compare_view(
         route="/compare",
-        season=SUPPORTED_SEASON,
+        season=current_season(),
         health=health,
         comparison=comparison,
     )
     context = {
         "request": request,
         "page_title": "Player Compare",
-        "season": SUPPORTED_SEASON,
+        "season": current_season(),
         "health": health,
         "player_a_detail": player_a_detail,
         "player_a_id": player_a_id,

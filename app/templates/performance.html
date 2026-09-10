@@ -8,14 +8,14 @@
       </div>
     </div>
     <p class="subhead">
-      Review every 2025-26 playoff player game against each player's own season baseline, including minutes, shot-making, and box-score production.
+      Review every {{ season }} playoff player game against each player's own season baseline, including minutes, shot-making, and box-score production.
     </p>
   </section>
 
   <section class="card performance-controls">
     <div class="card-header">
       <h2>Controls</h2>
-      <span class="meta" id="performance-window-meta">2025-26 Playoffs</span>
+      <span class="meta" id="performance-window-meta">{{ season }} Playoffs</span>
     </div>
     <div class="performance-control-grid">
       <label class="performance-field">
@@ -399,5 +399,5 @@
     }
   </style>
 
-  <script src="/static/performance.js?v={{ static_version }}"></script>
+  <script type="module" src="/static/performance.js?v={{ static_version }}"></script>
 {% endblock %}

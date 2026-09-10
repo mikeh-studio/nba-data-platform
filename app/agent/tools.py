@@ -678,7 +678,7 @@ def get_tool_schemas() -> list[dict[str, Any]]:
         {
             "type": "function",
             "name": "resolve_player",
-            "description": "Resolve a player name to qualified 2025-26 player matches.",
+            "description": "Resolve a player name to players in the selected season.",
             "strict": True,
             "parameters": {
                 "type": "object",
@@ -972,7 +972,13 @@ class StatsToolRunner:
         if not query:
             return {"status": "error", "message": "Player name is required."}
         max_rows = _coerce_limit(limit, default=5, minimum=1, maximum=8)
-        cache_key = ("resolve_player", query.casefold(), max_rows)
+        settings = getattr(self.repo, "settings", None)
+        scope = (
+            getattr(settings, "project_id", ""),
+            getattr(settings, "gold_dataset", ""),
+            getattr(settings, "season", "2025-26"),
+        )
+        cache_key = ("resolve_player", scope, query.casefold(), max_rows)
         cached = _resolve_player_cache.get(cache_key, self.cache_ttl_seconds)
         if cached is not None:
             return cached

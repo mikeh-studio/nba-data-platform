@@ -1,3 +1,4 @@
+import { seasonFetch } from "./season.js";
 (function () {
   "use strict";
 
@@ -111,7 +112,7 @@
   }
 
   async function fetchJson(url) {
-    const response = await fetch(url, { cache: "no-store" });
+    const response = await seasonFetch(url, { cache: "no-store" });
     if (!response.ok) {
       throw new Error(`Request failed: ${response.status}`);
     }

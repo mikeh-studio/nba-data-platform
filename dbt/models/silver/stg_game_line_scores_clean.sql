@@ -59,5 +59,5 @@ select
     cast(pts as {{ int64_type() }}) as pts,
     cast(ingested_at_utc as timestamp) as ingested_at_utc
 from {{ raw_game_line_scores_relation }}
-where cast(season as {{ varchar_type() }}) = '2025-26'
-  and date(game_date) between date('2025-07-01') and date('2026-06-30')
+where cast(season as {{ varchar_type() }}) = '{{ warehouse_season() }}'
+  and date(game_date) between date('{{ warehouse_season_start() }}') and date('{{ warehouse_season_end() }}')

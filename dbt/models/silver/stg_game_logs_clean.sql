@@ -45,8 +45,8 @@ concat(
 with source_data as (
     select *
     from {{ raw_game_logs_relation }}
-    where cast(season as {{ varchar_type() }}) = '2025-26'
-      and date(game_date) between date('2025-07-01') and date('2026-06-30')
+    where cast(season as {{ varchar_type() }}) = '{{ warehouse_season() }}'
+      and date(game_date) between date('{{ warehouse_season_start() }}') and date('{{ warehouse_season_end() }}')
 ),
 deduped as (
     select

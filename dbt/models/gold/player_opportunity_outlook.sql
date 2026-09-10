@@ -3,8 +3,8 @@
     schema=env_var('BQ_DATASET_GOLD', env_var('BQ_DATASET', 'nba_gold'))
 ) }}
 
-{% set today = 'current_date()' if target.type == 'bigquery' else 'current_date' %}
-{% set next_week = 'date_add(current_date(), interval 7 day)' if target.type == 'bigquery' else "current_date + interval '7 day'" %}
+{% set today = warehouse_today() %}
+{% set next_week = 'date_add(' ~ warehouse_today() ~ ', interval 7 day)' if target.type == 'bigquery' else warehouse_today() ~ " + interval '7 day'" %}
 
 with latest_team as (
     select

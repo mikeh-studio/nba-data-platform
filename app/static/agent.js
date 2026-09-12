@@ -232,12 +232,13 @@ function renderLineChart(chart) {
   const bottom = pad.top + innerHeight;
   const maxValue = Math.max(...pointsRaw.map((point) => point.yValue), 1);
   const yMax = Math.max(1, Math.ceil(maxValue * 1.15));
+  const yMin = Math.min(0, Math.floor(Math.min(...pointsRaw.map((point) => point.yValue)) * 1.15));
   const points = pointsRaw.map((point, index) => {
     const x =
       pointsRaw.length === 1
         ? pad.left + innerWidth / 2
         : pad.left + (index / (pointsRaw.length - 1)) * innerWidth;
-    const y = bottom - (point.yValue / yMax) * innerHeight;
+    const y = bottom - ((point.yValue - yMin) / (yMax - yMin)) * innerHeight;
     return { ...point, x, y };
   });
   const grid = [0, 0.25, 0.5, 0.75, 1]
@@ -245,7 +246,7 @@ function renderLineChart(chart) {
       const y = bottom - ratio * innerHeight;
       return `
         <line x1="${pad.left}" y1="${y.toFixed(1)}" x2="${width - pad.right}" y2="${y.toFixed(1)}" stroke="rgba(255,255,255,0.08)" />
-        <text class="agent-axis" x="12" y="${(y + 4).toFixed(1)}">${Math.round(yMax * ratio)}</text>
+        <text class="agent-axis" x="12" y="${(y + 4).toFixed(1)}">${Math.round(yMin + (yMax - yMin) * ratio)}</text>
       `;
     })
     .join("");
@@ -1324,6 +1325,7 @@ function initAgentPage() {
 
 if (typeof window === "undefined" || window.__NBA_ASK_TEST_HOOKS__) {
   globalThis.__askAgentTest = {
+    renderLineChart,
     normalizeAnswerMarkdown,
     renderAnswerMarkdown,
     loadHistoryState,

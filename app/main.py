@@ -5,6 +5,7 @@ import logging
 import time
 from collections.abc import MutableMapping
 from contextlib import asynccontextmanager
+from contextvars import copy_context
 from copy import deepcopy
 from datetime import UTC, date, datetime
 from functools import lru_cache
@@ -56,7 +57,7 @@ from app.telemetry import instrument_compare_view, instrument_player_view
 from app.what_changed import ComparisonPeriod, SeasonPhase, WhatChangedUnavailable
 
 BASE_DIR = Path(__file__).resolve().parent
-STATIC_VERSION = "20260909-season-selector-v1"
+STATIC_VERSION = "20260911-semantic-game-log-v1"
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 templates.env.globals["static_version"] = STATIC_VERSION
 templates.env.globals["available_seasons"] = SEASONS
@@ -887,6 +888,8 @@ def api_agent_ask_stream(
         request, payload, settings
     )
 
+    request_context = copy_context()
+
     def event_stream():
         queue: Queue[dict[str, Any] | None] = Queue()
 
@@ -951,7 +954,7 @@ def api_agent_ask_stream(
                 trace.emit()
                 queue.put(None)
 
-        Thread(target=worker, daemon=True).start()
+        Thread(target=request_context.run, args=(worker,), daemon=True).start()
         yield _sse(
             "meta",
             {"request_id": request_id, "conversation_id": conversation_id},

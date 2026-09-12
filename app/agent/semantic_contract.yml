@@ -1,0 +1,25 @@
+version: nba_semantics/0.1
+source: fct_player_game_stats
+grain: [season, game_id, player_id]
+defaults:
+  season_type: Regular Season
+  min_games: 5
+  timezone: America/New_York
+  fantasy_metric: fantasy_proxy_weighted
+metrics:
+  pts: {label: PTS, numerator: pts, unit: count, direction: higher}
+  reb: {label: REB, numerator: reb, unit: count, direction: higher}
+  ast: {label: AST, numerator: ast, unit: count, direction: higher}
+  stl: {label: STL, numerator: stl, unit: count, direction: higher}
+  blk: {label: BLK, numerator: blk, unit: count, direction: higher}
+  tov: {label: TOV, numerator: tov, unit: count, direction: lower}
+  fg3m: {label: 3PM, numerator: fg3m, unit: count, direction: higher}
+  min: {label: MIN, numerator: min, unit: minutes, direction: higher}
+  fg_pct: {label: FG%, numerator: fgm, denominator: fga, attempt_field: fga, unit: ratio, direction: higher}
+  fg3_pct: {label: 3P%, numerator: fg3m, denominator: fg3a, attempt_field: fg3a, unit: ratio, direction: higher}
+  ft_pct: {label: FT%, numerator: ftm, denominator: fta, attempt_field: fta, unit: ratio, direction: higher}
+  ts_pct: {label: TS%, numerator: pts, denominator: '2 * (fga + 0.44 * fta)', attempt_field: fga, unit: ratio, direction: higher}
+  plus_minus: {label: '+/-', numerator: plus_minus, unit: count, direction: higher}
+  fantasy_points_simple: {label: Simple box-score index, numerator: 'pts + reb + ast + stl + blk - tov', unit: index, direction: higher}
+  fantasy_proxy_weighted: {label: Weighted fantasy proxy, numerator: 'pts + 1.2 * reb + 1.5 * ast + 3 * stl + 3 * blk + fg3m - tov', unit: index, direction: higher}
+  points_created: {label: Attributed points proxy, numerator: 'pts + 2 * ast', unit: index, direction: higher}

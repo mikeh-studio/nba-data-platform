@@ -1457,7 +1457,23 @@ class StatsAgent:
         elif self.client is None and not self.settings.openai_api_key:
             self._get_client()
 
-        if self.semantic_agent is not None:
+        routing_question = cleaned_question
+        if conversation_id and self.conversation_store:
+            pending_route = self.conversation_store.get_pending_clarification(
+                conversation_id
+            )
+            if pending_route is not None:
+                routing_question = pending_route.question
+        legacy_route = build_agent_plan(
+            routing_question
+        ).route == AgentRoute.SIMILARITY or bool(
+            re.search(
+                r"\bleague\s+(?:average|baseline)\b|\bagainst\s+baseline\b",
+                routing_question,
+                re.I,
+            )
+        )
+        if self.semantic_agent is not None and not legacy_route:
             try:
                 return self.semantic_agent.answer(
                     cleaned_question,

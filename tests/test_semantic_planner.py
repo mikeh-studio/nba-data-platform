@@ -260,3 +260,50 @@ def test_missing_attempt_policy_is_deterministic(question):
         None, model="test", question=question, selected_season="2024-25"
     )
     assert plan["status"] == "clarification_required" and plan["model_calls"] == 0
+
+
+@pytest.mark.parametrize(
+    "question,expected",
+    [
+        (
+            "Compare players from 2025-01-01 through 2025-01-07",
+            {
+                "window": "date_range",
+                "start_date": "2025-01-01",
+                "as_of": "2025-01-07",
+                "n": None,
+            },
+        ),
+        ("Compare players in the last 7 days", {"window": "last_n_days", "n": 7}),
+        (
+            "Compare players including regular season and playoffs",
+            {"season_type": "Both"},
+        ),
+    ],
+)
+def test_shared_explicit_scope_overrides_both_comparison_sides(question, expected):
+    raw = {
+        "status": "compare",
+        "message": "",
+        "queries": [
+            {"window": "season_to_date", "season_type": "Regular Season"},
+            {"window": "season_to_date", "season_type": "Playoffs"},
+        ],
+    }
+    result = plan_question(
+        client_for(raw), model="test", question=question, selected_season="2024-25"
+    )
+    for query in result["queries"]:
+        assert all(query[k] == v for k, v in expected.items())
+
+
+def test_distinct_comparison_ranges_are_not_silently_overwritten():
+    raw = {"status": "compare", "message": "", "queries": [{}, {}]}
+    result = plan_question(
+        client_for(raw),
+        model="test",
+        question="Compare points from 2025-01-01 through 2025-01-07 versus from 2025-02-01 through 2025-02-07",
+        selected_season="2024-25",
+    )
+    assert result["status"] == "clarification_required"
+    assert result["queries"] == []

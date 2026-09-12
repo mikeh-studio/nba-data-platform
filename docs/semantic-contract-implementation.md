@@ -49,7 +49,7 @@ The runner validates model plans before calculating any answer.
 | Historical SQL checks | 20/20 pass | Phase, identity, trade, ratios, cohort, membership and comparison checks across both historical seasons |
 | Historical injury cases | 2/2 pass | Ambiguous archive times produce unverified ordering |
 | Language suite, latest run | 60/60 pass | 14 families, three phrasings each, with repeated ambiguity/policy requests |
-| Python regression suite | 474 pass, 1 skip | Local implementation and regression tests |
+| Python regression suite | 483 pass, 1 skip | Local implementation and regression tests |
 
 Lint, formatting and static typing pass. The language run used the configured
 `gpt-5.4-mini`: 42 actual model calls and 18 deterministic results. It exercised synthetic evidence
@@ -126,8 +126,9 @@ with independent application validation.
 BigQuery-backed Ask supports metric summaries, rankings, percentiles, two-query
 comparisons, and single-player metric game logs with appearance charts. JSON and SSE preserve the selected season, including historical
 conversation storage. Unsupported operations return a structured unsupported result;
-there is no fallback to arbitrary SQL. Legacy similarity recommendations and injury answers are not part of this governed
-slice. Rolling averages, cumulative charts and multi-metric game logs remain unsupported.
+there is no fallback from a failed governed query to arbitrary SQL. Similarity requests and explicit league-average/baseline comparisons retain their
+legacy routes, including pending player clarification. They do not claim governed
+semantic evidence. Injury answers remain outside this governed slice. Rolling averages, cumulative charts and multi-metric game logs remain unsupported.
 
 Game logs reuse the same phase, date, appearance-window, team and opponent filters.
 Rows are chronological; a display cap keeps the latest requested observations and
@@ -156,6 +157,14 @@ scope, not a new serving table; cold-request latency still needs measurement.
 - Extend language coverage to remaining proposal families and realistic historical
   question variants; the current language suite covers 14 families, not all 24.
 - Obtain verified game-start timestamps before claiming historical pregame ordering.
-- Extend governed coverage for legacy Ask operations before claiming feature parity.
+- Migrate preserved legacy similarity and league-baseline workflows before claiming
+  complete governed coverage.
 - Validate the Anthropic provider with live requests; this run used OpenAI only.
 - Measure bounded serving cost and latency before considering new serving tables.
+
+## PR review corrections
+
+Shared explicit ranges, trailing-day windows and combined phases apply to both
+comparison queries. Distinct explicit comparison windows return clarification
+instead of silently overwriting either side. Slash-form dates are excluded from
+season extraction while slash-separated season tokens remain supported.

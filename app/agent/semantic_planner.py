@@ -309,8 +309,38 @@ def plan_question(
                     "invalid_plan", "Planner selected an unresolved player reference"
                 )
             query["player_name"] = references[handle]
-    if plan["status"] == "query":
-        plan["queries"][0].update(scope)
+    if plan["status"] in ("query", "compare"):
+        if plan["status"] == "compare" and scope:
+            ranges = re.findall(
+                r"\bfrom\s+(\d{4}-\d{2}-\d{2})\s+(?:through|to)\s+(\d{4}-\d{2}-\d{2})\b",
+                question,
+                re.I,
+            )
+            days = re.findall(
+                r"\b(?:last|preceding)\s+(\d+)\s+(?:calendar\s+)?days\b", question, re.I
+            )
+            # Shared literal scope is authoritative. Distinct per-side windows need
+            # clarification rather than silently overwriting one with the other.
+            competing_window = "window" in scope and (
+                len(set(ranges)) > 1
+                or len(set(days)) > 1
+                or bool(
+                    re.search(
+                        r"\b(?:prior|previous)\s+\d+\s+(?:games|days)\b|\bseason\s+(?:baseline|average|to date)\b|\bseason_to_date\b",
+                        question,
+                        re.I,
+                    )
+                )
+            )
+            if competing_window:
+                return {
+                    "status": "clarification_required",
+                    "queries": [],
+                    "message": "Please specify the date range and phase for each comparison side separately; shared scope cannot safely resolve these different windows.",
+                    "model_calls": 1,
+                }
+        for query in plan["queries"]:
+            query.update(scope)
     plan["model_calls"] = 1
     return plan
 

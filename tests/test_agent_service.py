@@ -5,6 +5,8 @@ import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.agent.conversation import InMemoryConversationStore
@@ -769,3 +771,28 @@ def test_answer_field_stream_ignores_payloads_without_answer_string() -> None:
 
     assert emitted == []
     assert stream.emitted is False
+
+
+@pytest.mark.parametrize(
+    "question,route,tool",
+    [
+        ("Who is similar to Tyrese Maxey?", "similarity", "find_similar_players"),
+        (
+            "Compare LeBron's last 10 games against league baseline for points.",
+            "player_trend",
+            "get_player_trends",
+        ),
+    ],
+)
+def test_governed_agent_preserves_advertised_legacy_workflows(question, route, tool):
+    agent = StatsAgent(
+        _settings(), AgentServiceFakeRepository(), client=SequenceClient([])
+    )
+
+    def forbidden(**kwargs):
+        raise AssertionError("Advertised legacy workflow entered semantic path")
+
+    agent.semantic_agent = SimpleNamespace(answer=forbidden)
+    payload = agent.answer(question)
+    assert payload["agent_plan"]["route"] == route
+    assert tool in [call["name"] for call in payload["tool_calls"]]

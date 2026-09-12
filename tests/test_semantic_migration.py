@@ -301,3 +301,9 @@ def test_game_log_unknown_value_is_visible_and_chart_is_withheld():
     assert payload["tables"][0]["rows"][0][-1] == "Unavailable"
     assert payload["charts"] == []
     assert any("Missing values are not zero" in a for a in payload["assumptions"])
+
+
+@pytest.mark.parametrize("date", ["2025/02/14", "2025-02-14", "2025–02–14"])
+def test_dates_are_not_seasons(date):
+    assert requested_seasons(f"LeBron PPG as of {date}", "2024-25") == ["2024-25"]
+    assert requested_seasons(f"2023/24 PPG as of {date}", "2024-25") == ["2023-24"]

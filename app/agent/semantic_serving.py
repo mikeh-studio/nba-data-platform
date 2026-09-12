@@ -16,7 +16,7 @@ from app.seasons import DEFAULT_SEASON, validate_season
 
 def requested_seasons(question: str, selected: str) -> list[str]:
     seasons = []
-    for match in re.finditer(r"\b(20\d{2})[-–/](20\d{2}|\d{2})\b(?!-\d)", question):
+    for match in re.finditer(r"\b(20\d{2})[-–/](20\d{2}|\d{2})\b(?![-/–]\d)", question):
         start, end = match.groups()
         season = f"{start}-{end[-2:]}"
         try:

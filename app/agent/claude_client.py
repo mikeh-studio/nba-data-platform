@@ -215,7 +215,10 @@ class ClaudeResponsesClient:
             messages[-1]["content"][-1]["cache_control"] = {"type": "ephemeral"}
         request: dict[str, Any] = {
             "model": model,
-            "max_tokens": _MAX_OUTPUT_TOKENS,
+            "max_tokens": min(
+                int(kwargs.get("max_output_tokens") or _MAX_OUTPUT_TOKENS),
+                _MAX_OUTPUT_TOKENS,
+            ),
             "messages": messages,
         }
         instructions = str(kwargs.get("instructions") or "")

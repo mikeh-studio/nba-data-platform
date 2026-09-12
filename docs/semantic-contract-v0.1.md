@@ -1,14 +1,21 @@
 # NBA agent semantic contract and evaluation proposal
 
-Status: **Draft for review — no implementation authorized by this document.**
+Status: **Design reference — first deterministic implementation slice available below.**
 Version: `nba_semantics/0.1-draft`
 Prepared: September 9, 2026
+
+## Implementation status — September 10, 2026
+
+The contract runner, bounded historical evaluation, and experimental language evaluation are implemented.
+See [implementation and validation scope](semantic-contract-implementation.md).
+The original proposal below remains the design reference; the complete historical
+and LLM evaluation gates are not yet implemented, and Ask behavior has not migrated.
 
 ## Decision this proposal supports
 
 Establish a shared definition of what the NBA agent may answer, how it computes the answer, and what evidence it returns. Start by describing and evaluating existing gold models. New physical tables are an option only after evaluation identifies a correctness, coverage, or performance gap.
 
-This deliverable contains proposed semantics and acceptance criteria. No code, dbt models, warehouse objects, existing metric definitions, or agent behavior were changed. Evaluation cases below have not been executed and do not constitute accuracy results.
+The original proposal defined semantics and acceptance criteria without changing code or warehouse objects. The implementation linked above now exercises representative synthetic cases; the full evaluation families below remain acceptance criteria, not production accuracy results.
 
 ## 1. Scope and current evidence
 
@@ -82,7 +89,7 @@ A zero denominator produces NULL/unavailable, not 0%. Do not average per-game pe
 
 NULL is unknown, not zero. For an explicit player's incomplete sample, expose partial coverage and both row counts. Exclude incomplete required-component samples from default rankings until an approved policy covers them; return excluded-player counts. Reject impossible component relationships rather than quietly correcting source values.
 
-“Fantasy points” without a specified scoring system requires clarification between the project's two formulas or a supplied league formula. Neither formula implies compatibility with an external fantasy provider. Quarantine `category_score_6cat` and `category_score_7cat` from semantic exposure until their intended components and names are approved.
+“Fantasy Score,” “fantasy points,” and unspecified fantasy scoring default to `fantasy_proxy_weighted`, as approved by the user. Explicit simple scoring uses `fantasy_points_simple`; external league formulas require separate support. Neither formula implies compatibility with an external fantasy provider. Quarantine `category_score_6cat` and `category_score_7cat` from semantic exposure until their intended components and names are approved.
 
 ## 5. Eligibility, rankings, and capabilities
 
@@ -155,7 +162,7 @@ Do not generate expected answers using the same production aggregation helpers b
 | E14 | Earlier Out report; later report after tipoff | Use only pre-tipoff evidence; source URL/time present; no claim of later status knowledge |
 | E15 | Missing injury report or unresolved identity | Unknown/ambiguous, never “healthy”; preserve coverage warning |
 | E16 | Same player across 2023-24 and 2024-25 | Aggregate each season separately; no blended last-N window |
-| E17 | “Fantasy points” | Clarify simple vs weighted scoring; never conflate formulas |
+| E17 | “Fantasy points” | Default to `fantasy_proxy_weighted`; honor explicit simple scoring |
 | E18 | Discovered metric with unsupported ranking operation | Structured unsupported operation, no tool exception or metric substitution |
 | E19 | Duplicate player-game or one-to-many injury join | Validation failure before sums are presented |
 | E20 | NULL component or missing quarter scoring | Partial/unavailable evidence; no zero fill or fabricated period breakdown |
@@ -192,7 +199,7 @@ These decisions are proposed, not approved by starting this draft:
 | --- | --- | --- |
 | Default season phase | Regular Season | Changes current combined-phase summaries; disclose on every answer |
 | Ranking policy | Five appearances for count metrics; explicit attempt thresholds for shooting | Project cohort, not official NBA qualification; may ask a short clarification |
-| Fantasy terminology | Separate simple and weighted identifiers; clarify unspecified scoring | Prevents inconsistent “fantasy points” across agent/UI surfaces |
+| Fantasy terminology | Separate identifiers; default unspecified scoring to `fantasy_proxy_weighted` | Prevents inconsistent “fantasy points” across agent/UI surfaces |
 | Canonical period shooting percentage | Ratio of summed components | Changes existing averages of game percentages; needs compatibility review |
 | Physical tables | Decide after evaluation | Keeps initial work focused on definitions and measured gaps |
 

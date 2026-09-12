@@ -1,0 +1,228 @@
+{
+  "version": 1,
+  "selected_season": "2024-25",
+  "human_reviewed": false,
+  "cases": [
+    {
+      "id": "regular",
+      "questions": [
+        "What is Regular Player averaging in points this season?",
+        "Show Regular Player points per game for the season.",
+        "Give the season PPG for Regular Player."
+      ],
+      "expected": {
+        "status": "ok",
+        "resolved_queries.0.season": "2024-25",
+        "resolved_queries.0.season_type": "Regular Season",
+        "resolved_queries.0.aggregation": "average",
+        "evidence.rows.0.value": 10,
+        "evidence.rows.0.observed_games": 7
+      },
+      "repeats": 1
+    },
+    {
+      "id": "playoffs",
+      "questions": [
+        "Regular Player playoff PPG in 2024-25?",
+        "How many points per game did Regular Player score in the 2024-2025 playoffs?",
+        "For the 2024-25 postseason, show Regular Player average points."
+      ],
+      "expected": {
+        "status": "ok",
+        "resolved_queries.0.season_type": "Playoffs",
+        "evidence.rows.0.value": 24,
+        "evidence.rows.0.observed_games": 1
+      },
+      "repeats": 1
+    },
+    {
+      "id": "ratio",
+      "questions": [
+        "What is Small Sample field goal percentage this season?",
+        "Show season FG% for Small Sample.",
+        "How efficiently did Small Sample shoot from the field over the season? Give FG%."
+      ],
+      "expected": {
+        "status": "ok",
+        "resolved_queries.0.metric": "fg_pct",
+        "resolved_queries.0.aggregation": "ratio",
+        "evidence.rows.0.value": 0.1,
+        "evidence.rows.0.numerator": 1,
+        "evidence.rows.0.denominator": 10
+      },
+      "repeats": 1
+    },
+    {
+      "id": "trade",
+      "questions": [
+        "Regular Player PPG while playing for AAA this season?",
+        "Show Regular Player average points in appearances for AAA.",
+        "Filter Regular Player to team AAA and give this season points per game."
+      ],
+      "expected": {
+        "status": "ok",
+        "resolved_queries.0.team_abbr": "AAA",
+        "evidence.rows.0.observed_games": 3,
+        "evidence.rows.0.game_ids": [
+          "003",
+          "002",
+          "001"
+        ]
+      },
+      "repeats": 1
+    },
+    {
+      "id": "compare",
+      "questions": [
+        "Compare Regular Player points per game in his last five games versus the preceding five.",
+        "How did Regular Player PPG in the most recent five appearances compare with the prior five?",
+        "Regular Player: last five vs prior five average points."
+      ],
+      "expected": {
+        "status": "ok",
+        "resolved_queries.0.window": "last_n_games",
+        "resolved_queries.1.window": "prior_n_games",
+        "evidence.current.rows.0.observed_games": 5,
+        "evidence.baseline.rows.0.observed_games": 2,
+        "evidence.overlapping_game_ids": [],
+        "evidence.baseline.rows.0.sample_warning": "partial_window"
+      },
+      "repeats": 1
+    },
+    {
+      "id": "fantasy",
+      "questions": [
+        "What is Regular Player average Fantasy Score?",
+        "Show Regular Player fantasy scoring per game this season.",
+        "How many fantasy points does Regular Player average?"
+      ],
+      "expected": {
+        "status": "ok",
+        "resolved_queries.0.metric": "fantasy_proxy_weighted",
+        "resolved_queries.0.aggregation": "average",
+        "evidence.rows.0.value": 19.9
+      },
+      "repeats": 3
+    },
+    {
+      "id": "qualification",
+      "questions": [
+        "Who leads the league in TS%?",
+        "Rank players by true shooting percentage.",
+        "Show the top ten TS% players this season."
+      ],
+      "expected": {
+        "status": "clarification_required",
+        "evidence": null
+      },
+      "repeats": 3
+    },
+    {
+      "id": "ambiguity",
+      "questions": [
+        "What is shared averaging in points?",
+        "Give shared points per game this season.",
+        "Show the season PPG for shared."
+      ],
+      "expected": {
+        "status": "clarification_required",
+        "identity.status": "ambiguous",
+        "evidence": null
+      },
+      "repeats": 3
+    },
+    {
+      "id": "combined",
+      "questions": [
+        "Regular Player points per game across both regular season and playoffs?",
+        "Combine Regular Season and Playoffs for Regular Player season average points.",
+        "Give Regular Player PPG including both the regular season and postseason."
+      ],
+      "expected": {
+        "status": "ok",
+        "resolved_queries.0.season_type": "Both",
+        "evidence.rows.0.observed_games": 8,
+        "evidence.rows.0.value": 11.75
+      },
+      "repeats": 1
+    },
+    {
+      "id": "cross_season",
+      "questions": [
+        "Compare Regular Player PPG in 2024-25 with 2023-24.",
+        "How did Regular Player average points change from 2023-24 to 2024-25?",
+        "Regular Player: 2024-25 versus 2023-24 points per game."
+      ],
+      "expected": {
+        "status": "ok",
+        "resolved_queries.0.season": "2024-25",
+        "resolved_queries.1.season": "2023-24",
+        "evidence.current.rows.0.value": 10,
+        "evidence.baseline.rows.0.value": 40,
+        "evidence.overlapping_game_ids": []
+      },
+      "repeats": 1
+    },
+    {
+      "id": "unsupported",
+      "questions": [
+        "Show Regular Player first-quarter points.",
+        "How many points did Regular Player score in Q1?",
+        "Give the first quarter scoring breakdown for Regular Player."
+      ],
+      "expected": {
+        "status": "unsupported",
+        "evidence": null
+      },
+      "repeats": 1
+    },
+    {
+      "id": "calendar",
+      "questions": [
+        "Regular Player points per game in the last 14 days as of 2025-02-14?",
+        "As of February 14, 2025, give Regular Player PPG over the preceding 14 calendar days.",
+        "Show Regular Player average points from 2025-02-01 through 2025-02-14."
+      ],
+      "expected": {
+        "status": "no_observations",
+        "evidence.scope.as_of": "2025-02-14",
+        "evidence.scope.window_start": "2025-02-01",
+        "evidence.rows": []
+      },
+      "repeats": 1
+    },
+    {
+      "id": "game_log",
+      "questions": [
+        "Show Regular Player points game log for the last two appearances.",
+        "Chart Regular Player points in each of his last 2 games.",
+        "Give a game-by-game points trend for Regular Player over the last 2 appearances."
+      ],
+      "expected": {
+        "status": "ok",
+        "resolved_queries.0.operation": "game_log",
+        "evidence.rows.0.game_id": "006",
+        "evidence.rows.1.game_id": "007",
+        "evidence.rows.0.value": 10,
+        "evidence.displayed_games": 2
+      },
+      "repeats": 1
+    },
+    {
+      "id": "game_log_ratio",
+      "questions": [
+        "Show Small Sample FG% game by game this season.",
+        "Chart Small Sample field goal percentage for each appearance this season.",
+        "Give Small Sample a season game log of shooting percentage from the field."
+      ],
+      "expected": {
+        "status": "ok",
+        "resolved_queries.0.operation": "game_log",
+        "evidence.rows.0.value": 1,
+        "evidence.rows.1.value": 0,
+        "evidence.displayed_games": 2
+      },
+      "repeats": 1
+    }
+  ]
+}

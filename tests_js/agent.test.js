@@ -294,3 +294,13 @@ test("restoring a conversation repaints latest and older turn side panels", asyn
   elements["[data-agent-answer]"].children[0].dispatch("click");
   assert.match(elements["[data-agent-tables]"].innerHTML, /Old Table/);
 });
+
+test("line charts keep negative and positive observations inside the plot", async () => {
+  const agent = await loadAgentModule();
+  const html = agent.renderLineChart({title: "Plus/minus", series: [{label: "Player", points: [{x: "one", y: -25}, {x: "two", y: 0}, {x: "three", y: 20}]}]});
+  const positions = [...html.matchAll(/class="agent-dot" cx="[^"]+" cy="([^"]+)"/g)].map(m => Number(m[1]));
+  assert.equal(positions.length, 3);
+  assert.ok(positions.every(y => y >= 26 && y <= 204));
+  assert.ok(positions[0] > positions[1] && positions[1] > positions[2]);
+  assert.match(html, /Player: -25/);
+});

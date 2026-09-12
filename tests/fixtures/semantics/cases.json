@@ -1,0 +1,714 @@
+{
+  "version": 1,
+  "evidence_kind": "synthetic",
+  "human_reviewed": false,
+  "rows": [
+    {
+      "season": "2024-25",
+      "season_type": "Regular Season",
+      "player_id": 1,
+      "game_id": "001",
+      "game_date": "2025-01-01",
+      "team_abbr": "AAA",
+      "opponent_abbr": "BBB",
+      "pts": 10,
+      "reb": 2,
+      "ast": 3,
+      "stl": 1,
+      "blk": 0,
+      "tov": 1,
+      "fgm": 4,
+      "fga": 10,
+      "fg3m": 1,
+      "fg3a": 3,
+      "ftm": 1,
+      "fta": 2,
+      "min": 20,
+      "plus_minus": 2
+    },
+    {
+      "season": "2024-25",
+      "season_type": "Regular Season",
+      "player_id": 1,
+      "game_id": "002",
+      "game_date": "2025-01-02",
+      "team_abbr": "AAA",
+      "opponent_abbr": "BBB",
+      "pts": 10,
+      "reb": 2,
+      "ast": 3,
+      "stl": 1,
+      "blk": 0,
+      "tov": 1,
+      "fgm": 4,
+      "fga": 10,
+      "fg3m": 1,
+      "fg3a": 3,
+      "ftm": 1,
+      "fta": 2,
+      "min": 20,
+      "plus_minus": 2
+    },
+    {
+      "season": "2024-25",
+      "season_type": "Regular Season",
+      "player_id": 1,
+      "game_id": "003",
+      "game_date": "2025-01-03",
+      "team_abbr": "AAA",
+      "opponent_abbr": "BBB",
+      "pts": 10,
+      "reb": 2,
+      "ast": 3,
+      "stl": 1,
+      "blk": 0,
+      "tov": 1,
+      "fgm": 4,
+      "fga": 10,
+      "fg3m": 1,
+      "fg3a": 3,
+      "ftm": 1,
+      "fta": 2,
+      "min": 20,
+      "plus_minus": 2
+    },
+    {
+      "season": "2024-25",
+      "season_type": "Regular Season",
+      "player_id": 1,
+      "game_id": "004",
+      "game_date": "2025-01-04",
+      "team_abbr": "CCC",
+      "opponent_abbr": "BBB",
+      "pts": 10,
+      "reb": 2,
+      "ast": 3,
+      "stl": 1,
+      "blk": 0,
+      "tov": 1,
+      "fgm": 4,
+      "fga": 10,
+      "fg3m": 1,
+      "fg3a": 3,
+      "ftm": 1,
+      "fta": 2,
+      "min": 20,
+      "plus_minus": 2
+    },
+    {
+      "season": "2024-25",
+      "season_type": "Regular Season",
+      "player_id": 1,
+      "game_id": "005",
+      "game_date": "2025-01-05",
+      "team_abbr": "CCC",
+      "opponent_abbr": "BBB",
+      "pts": 10,
+      "reb": 2,
+      "ast": 3,
+      "stl": 1,
+      "blk": 0,
+      "tov": 1,
+      "fgm": 4,
+      "fga": 10,
+      "fg3m": 1,
+      "fg3a": 3,
+      "ftm": 1,
+      "fta": 2,
+      "min": 20,
+      "plus_minus": 2
+    },
+    {
+      "season": "2024-25",
+      "season_type": "Regular Season",
+      "player_id": 1,
+      "game_id": "006",
+      "game_date": "2025-01-06",
+      "team_abbr": "CCC",
+      "opponent_abbr": "BBB",
+      "pts": 10,
+      "reb": 2,
+      "ast": 3,
+      "stl": 1,
+      "blk": 0,
+      "tov": 1,
+      "fgm": 4,
+      "fga": 10,
+      "fg3m": 1,
+      "fg3a": 3,
+      "ftm": 1,
+      "fta": 2,
+      "min": 20,
+      "plus_minus": 2
+    },
+    {
+      "season": "2024-25",
+      "season_type": "Regular Season",
+      "player_id": 1,
+      "game_id": "007",
+      "game_date": "2025-01-07",
+      "team_abbr": "CCC",
+      "opponent_abbr": "BBB",
+      "pts": 10,
+      "reb": 2,
+      "ast": 3,
+      "stl": 1,
+      "blk": 0,
+      "tov": 1,
+      "fgm": 4,
+      "fga": 10,
+      "fg3m": 1,
+      "fg3a": 3,
+      "ftm": 1,
+      "fta": 2,
+      "min": 20,
+      "plus_minus": 2
+    },
+    {
+      "season": "2024-25",
+      "season_type": "Regular Season",
+      "player_id": 2,
+      "game_id": "008",
+      "game_date": "2025-01-01",
+      "team_abbr": "AAA",
+      "opponent_abbr": "BBB",
+      "pts": 2,
+      "reb": 2,
+      "ast": 3,
+      "stl": 1,
+      "blk": 0,
+      "tov": 1,
+      "fgm": 1,
+      "fga": 1,
+      "fg3m": 0,
+      "fg3a": 0,
+      "ftm": 0,
+      "fta": 0,
+      "min": 20,
+      "plus_minus": 2
+    },
+    {
+      "season": "2024-25",
+      "season_type": "Regular Season",
+      "player_id": 2,
+      "game_id": "009",
+      "game_date": "2025-01-02",
+      "team_abbr": "AAA",
+      "opponent_abbr": "BBB",
+      "pts": 0,
+      "reb": 2,
+      "ast": 3,
+      "stl": 1,
+      "blk": 0,
+      "tov": 1,
+      "fgm": 0,
+      "fga": 9,
+      "fg3m": 0,
+      "fg3a": 0,
+      "ftm": 0,
+      "fta": 0,
+      "min": 20,
+      "plus_minus": 2
+    },
+    {
+      "season": "2024-25",
+      "season_type": "Regular Season",
+      "player_id": 3,
+      "game_id": "010",
+      "game_date": "2025-01-03",
+      "team_abbr": "AAA",
+      "opponent_abbr": "BBB",
+      "pts": 30,
+      "reb": 2,
+      "ast": 3,
+      "stl": 1,
+      "blk": 0,
+      "tov": 1,
+      "fgm": 10,
+      "fga": 20,
+      "fg3m": 1,
+      "fg3a": 3,
+      "ftm": 9,
+      "fta": 10,
+      "min": 20,
+      "plus_minus": 2
+    },
+    {
+      "season": "2024-25",
+      "season_type": "Playoffs",
+      "player_id": 1,
+      "game_id": "011",
+      "game_date": "2025-04-01",
+      "team_abbr": "AAA",
+      "opponent_abbr": "BBB",
+      "pts": 24,
+      "reb": 2,
+      "ast": 3,
+      "stl": 1,
+      "blk": 0,
+      "tov": 1,
+      "fgm": 10,
+      "fga": 20,
+      "fg3m": 3,
+      "fg3a": 7,
+      "ftm": 1,
+      "fta": 2,
+      "min": 20,
+      "plus_minus": 2
+    },
+    {
+      "season": "2023-24",
+      "season_type": "Regular Season",
+      "player_id": 1,
+      "game_id": "012",
+      "game_date": "2024-01-01",
+      "team_abbr": "AAA",
+      "opponent_abbr": "BBB",
+      "pts": 40,
+      "reb": 2,
+      "ast": 3,
+      "stl": 1,
+      "blk": 0,
+      "tov": 1,
+      "fgm": 17,
+      "fga": 30,
+      "fg3m": 5,
+      "fg3a": 10,
+      "ftm": 1,
+      "fta": 2,
+      "min": 20,
+      "plus_minus": 2
+    }
+  ],
+  "coverage": [
+    [
+      "2024-25",
+      "Regular Season",
+      "2025-01-07"
+    ],
+    [
+      "2024-25",
+      "Playoffs",
+      "2025-04-01"
+    ],
+    [
+      "2023-24",
+      "Regular Season",
+      "2024-01-01"
+    ]
+  ],
+  "players": [
+    {
+      "player_id": 1,
+      "player_name": "Regular Player",
+      "aliases": [
+        "shared"
+      ]
+    },
+    {
+      "player_id": 2,
+      "player_name": "Small Sample",
+      "aliases": [
+        "shared"
+      ]
+    }
+  ],
+  "reports": [
+    {
+      "season": "2024-25",
+      "player_id": 1,
+      "game_date": "2025-01-07",
+      "matchup": "AAA@BBB",
+      "report_timestamp_utc": "2025-01-07T22:30:00Z",
+      "injury_status": "Out",
+      "source_url": "https://example.test/report-before.pdf"
+    },
+    {
+      "season": "2024-25",
+      "player_id": 1,
+      "game_date": "2025-01-07",
+      "matchup": "AAA@BBB",
+      "report_timestamp_utc": "2025-01-08T01:00:00Z",
+      "injury_status": "Available",
+      "source_url": "https://example.test/report-after.pdf"
+    }
+  ],
+  "cases": [
+    {
+      "id": "E01",
+      "request": {
+        "kind": "entity",
+        "name": "Small Sample"
+      },
+      "expect": {
+        "status": "ok",
+        "matches.0.player_id": 2
+      }
+    },
+    {
+      "id": "E02",
+      "request": {
+        "kind": "entity",
+        "name": "shared"
+      },
+      "expect": {
+        "status": "ambiguous",
+        "matches_count": 2
+      }
+    },
+    {
+      "id": "E03",
+      "request": {
+        "metric": "pts",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": 1
+      },
+      "expect": {
+        "rows.0.value": 10,
+        "rows.0.observed_games": 7,
+        "scope.season_type": "Regular Season"
+      }
+    },
+    {
+      "id": "E04",
+      "request": {
+        "metric": "fg_pct",
+        "season": "2024-25",
+        "aggregation": "ratio",
+        "player_id": 2
+      },
+      "expect": {
+        "rows.0.value": 0.1,
+        "rows.0.numerator": 1,
+        "rows.0.denominator": 10
+      }
+    },
+    {
+      "id": "E05",
+      "request": {
+        "metric": "ts_pct",
+        "season": "2024-25",
+        "aggregation": "ratio",
+        "player_id": 3
+      },
+      "expect": {
+        "rows.0.value": null
+      },
+      "patches": [
+        {
+          "game_id": "010",
+          "values": {
+            "pts": 0,
+            "fgm": 0,
+            "fga": 0,
+            "fg3m": 0,
+            "fg3a": 0,
+            "ftm": 0,
+            "fta": 0
+          }
+        }
+      ]
+    },
+    {
+      "id": "E06",
+      "request": {
+        "metric": "ts_pct",
+        "season": "2024-25",
+        "aggregation": "ratio",
+        "player_id": 3
+      },
+      "expect": {
+        "rows.0.value": 0.6147540983606558,
+        "rows.0.display_value": 61.5,
+        "rows.0.numerator": 30,
+        "rows.0.denominator": 48.8
+      }
+    },
+    {
+      "id": "E07",
+      "request": {
+        "metric": "pts",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": 1,
+        "window": "prior_n_games",
+        "n": 5
+      },
+      "expect": {
+        "rows.0.game_ids": [
+          "002",
+          "001"
+        ],
+        "rows.0.observed_games": 2,
+        "rows.0.sample_warning": "partial_window"
+      }
+    },
+    {
+      "id": "E08",
+      "request": {
+        "metric": "pts",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": 1,
+        "window": "last_n_days",
+        "n": 14,
+        "as_of": "2025-02-14"
+      },
+      "expect": {
+        "status": "no_observations",
+        "rows_count": 0,
+        "scope.window_start": "2025-02-01"
+      }
+    },
+    {
+      "id": "E09",
+      "request": {
+        "metric": "pts",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": 1,
+        "team_abbr": "AAA"
+      },
+      "expect": {
+        "rows.0.observed_games": 3,
+        "rows.0.game_ids": [
+          "003",
+          "002",
+          "001"
+        ]
+      }
+    },
+    {
+      "id": "E10",
+      "request": {
+        "metric": "ts_pct",
+        "season": "2024-25",
+        "aggregation": "ratio",
+        "player_id": null,
+        "operation": "rank",
+        "min_games": 5,
+        "min_attempts": 70
+      },
+      "expect": {
+        "rows_count": 1,
+        "rows.0.player_id": 1,
+        "cohort.size": 1,
+        "cohort.excluded_players": 2,
+        "cohort.attempt_field": "fga"
+      }
+    },
+    {
+      "id": "E11",
+      "request": {
+        "metric": "ts_pct",
+        "season": "2024-25",
+        "aggregation": "ratio",
+        "player_id": 1,
+        "operation": "rank"
+      },
+      "expect": {
+        "error": "clarification_required"
+      }
+    },
+    {
+      "id": "E12",
+      "request": {
+        "metric": "tov",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": null,
+        "operation": "rank",
+        "min_games": 1,
+        "direction": "higher"
+      },
+      "expect": {
+        "rows.0.rank": 1,
+        "rows.1.rank": 1,
+        "rows.2.rank": 1,
+        "cohort.direction": "higher"
+      }
+    },
+    {
+      "id": "E13",
+      "request": {
+        "metric": "pts",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": 1,
+        "operation": "percentile"
+      },
+      "expect": {
+        "rows.0.percentile": null,
+        "cohort.size": 1
+      }
+    },
+    {
+      "id": "E14",
+      "request": {
+        "kind": "injury",
+        "season": "2024-25",
+        "player_id": 1,
+        "game_date": "2025-01-07",
+        "matchup": "AAA@BBB",
+        "tipoff": "2025-01-07T19:00:00-05:00"
+      },
+      "expect": {
+        "report.injury_status": "Out",
+        "report.source_url": "https://example.test/report-before.pdf"
+      }
+    },
+    {
+      "id": "E15",
+      "request": {
+        "kind": "injury",
+        "season": "2024-25",
+        "player_id": 999,
+        "game_date": "2025-01-07",
+        "matchup": "AAA@BBB",
+        "tipoff": "2025-01-07T19:00:00-05:00"
+      },
+      "expect": {
+        "status": "unknown",
+        "report": null
+      }
+    },
+    {
+      "id": "E16",
+      "request": {
+        "metric": "pts",
+        "season": "2023-24",
+        "aggregation": "average",
+        "player_id": 1
+      },
+      "expect": {
+        "rows.0.value": 40,
+        "rows.0.observed_games": 1,
+        "rows.0.game_ids": [
+          "012"
+        ]
+      }
+    },
+    {
+      "id": "E17",
+      "request": {
+        "metric": "fantasy_points",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": 1
+      },
+      "expect": {
+        "metric.key": "fantasy_proxy_weighted",
+        "rows.0.value": 19.9
+      }
+    },
+    {
+      "id": "E18",
+      "request": {
+        "metric": "ts_pct",
+        "season": "2024-25",
+        "aggregation": "total",
+        "player_id": 1
+      },
+      "expect": {
+        "error": "unsupported_operation"
+      }
+    },
+    {
+      "id": "E19",
+      "request": {
+        "metric": "pts",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": 1
+      },
+      "expect": {
+        "error": "duplicate_grain"
+      },
+      "duplicate_game": "001"
+    },
+    {
+      "id": "E20",
+      "request": {
+        "metric": "pts",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": 1
+      },
+      "expect": {
+        "rows.0.missing_component_games": 1,
+        "rows.0.valid_games": 6,
+        "rows.0.observed_games": 7,
+        "rows.0.value": 10
+      },
+      "patches": [
+        {
+          "game_id": "001",
+          "values": {
+            "pts": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "E21",
+      "request": {
+        "metric": "pts",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": 1,
+        "as_of": "2025-01-03"
+      },
+      "expect": {
+        "rows.0.game_ids": [
+          "003",
+          "002",
+          "001"
+        ],
+        "rows.0.observed_games": 3
+      }
+    },
+    {
+      "id": "E22",
+      "request": {
+        "metric": "pts",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": 1
+      },
+      "expect": {
+        "provenance.data_through.Regular Season": "2025-01-07",
+        "provenance.model_built_at": "2026-09-10T00:00:00Z",
+        "scope.as_of": "2025-01-07"
+      }
+    },
+    {
+      "id": "E23",
+      "request": {
+        "metric": "pts",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": 1,
+        "season_type": "Play In"
+      },
+      "expect": {
+        "error": "unsupported_coverage"
+      }
+    },
+    {
+      "id": "E24",
+      "request": {
+        "metric": "pts",
+        "season": "2024-25",
+        "aggregation": "average",
+        "player_id": 1,
+        "season_type": "Both"
+      },
+      "expect": {
+        "rows.0.observed_games": 8,
+        "rows.0.value": 11.75,
+        "scope.season_type": "Both"
+      }
+    }
+  ]
+}

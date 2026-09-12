@@ -739,9 +739,21 @@ class StatsAgent:
         tool_runner: StatsToolRunner | None = None,
         conversation_store: ConversationStore | None = None,
         player_resolver: PlayerResolver | None = None,
+        semantic_warehouse: Any | None = None,
     ) -> None:
         self.settings = settings
         self.repo = repo
+        from app.agent.semantic_answer import SemanticAsk
+        from app.agent.semantic_serving import warehouse_for_repository
+        from app.repository import BigQueryWarehouseRepository
+
+        if semantic_warehouse is None and isinstance(repo, BigQueryWarehouseRepository):
+            semantic_warehouse = warehouse_for_repository(repo)
+        self.semantic_agent = (
+            SemanticAsk(settings, semantic_warehouse, conversation_store)
+            if semantic_warehouse is not None
+            else None
+        )
         self.client = client
         self.claude_client = claude_client
         self.tool_runner = tool_runner or StatsToolRunner(
@@ -1444,6 +1456,22 @@ class StatsAgent:
                 self._get_claude_client()
         elif self.client is None and not self.settings.openai_api_key:
             self._get_client()
+
+        if self.semantic_agent is not None:
+            try:
+                return self.semantic_agent.answer(
+                    cleaned_question,
+                    client=self._get_client(provider_name),
+                    model=selected_model,
+                    conversation_id=conversation_id,
+                    selected_player=selected_player,
+                    trace=trace,
+                    progress_callback=progress_callback,
+                )
+            except ValueError:
+                raise
+            except Exception as exc:
+                raise AgentExecutionError("Governed analytics request failed") from exc
 
         store = (
             self.conversation_store

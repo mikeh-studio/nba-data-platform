@@ -26,7 +26,7 @@ from app.seasons import validate_season
 
 PROMPT = """Translate the NBA question into governed metric queries. Supplied explicit_scope is resolved user intent, not a suggestion: a Both phase needs no further confirmation. A last-N versus prior-N request has status compare and exactly two summary queries; do not collapse it into a single query. Do not answer with statistics.
 Use selected_season unless a season is explicitly named; normalize 2024-2025 to 2024-25.
-Unqualified season means Regular Season. Playoffs is separate; combine only when explicitly requested.
+Unqualified season uses default_season_type. Playoffs is separate; combine only when explicitly requested.
 Unsupported seasons, play-in, preseason, quarter scoring, injury questions, arbitrary formulas or
 metrics absent from the contract require unsupported, never substitution or a guessed answer.
 Unspecified Fantasy Score, fantasy points, or fantasy scoring defaults to fantasy_proxy_weighted. Honor explicit simple scoring as fantasy_points_simple; other supplied league systems remain unsupported rather than substituted.
@@ -257,6 +257,7 @@ def plan_question(
                         "recognized_entity_mentions": mentions,
                         "explicit_scope": scope,
                         "default_fantasy_metric": contract.default_fantasy_metric,
+                        "default_season_type": contract.default_phase,
                         "available_team_abbreviations": sorted(set(teams)),
                         "metrics": [
                             metric.public() for metric in contract.metrics.values()

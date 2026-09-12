@@ -406,17 +406,6 @@ def publish(season: str, frames: dict, report: dict, args) -> None:
             published_table.description = fingerprint
             client.update_table(published_table, ["description"])
         print(f"Loaded {table_id}: {len(frame)}", flush=True)
-    snapshot_id = f"{args.project}.{env['BQ_DATASET_GOLD']}.analysis_snapshots"
-    try:
-        client.get_table(snapshot_id)
-    except NotFound:
-        # This runtime-only table is a schema placeholder for dbt tests; no
-        # current-season snapshot content belongs in a historical archive.
-        current_gold = os.environ.get("BQ_DATASET_GOLD", "nba_gold")
-        schema = client.get_table(
-            f"{args.project}.{current_gold}.analysis_snapshots"
-        ).schema
-        client.create_table(bigquery.Table(snapshot_id, schema=schema))
     variables = json.dumps(
         {"nba_season": season, "nba_as_of_date": report["as_of_date"]}
     )

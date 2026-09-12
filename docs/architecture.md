@@ -36,7 +36,6 @@ The Airflow DAG in `dags/nba_analytics_dag.py` runs this path:
 10. Merge into bronze raw tables with reconciliation checks.
 11. Run dbt bronze/silver/gold/agent models and tests.
 12. Publish similarity vectors and archetype clusters best-effort.
-13. Build deterministic `analysis_snapshots` output best-effort.
 14. Publish watermark and run metadata to `nba_metadata`, including any
     non-blocking asset status.
 
@@ -104,13 +103,11 @@ Gold facts and dimensions:
 
 Gold serving models:
 
-- `daily_leaderboard`
 - `player_trends`
 - `player_recent_form`
 - `player_category_profile`
 - `player_shot_location_profile`
 - `player_fantasy_rankings`
-- `fantasy_insights`
 - `player_opportunity_outlook`
 - `player_availability_current`
 - `player_search_index`
@@ -119,7 +116,6 @@ Gold serving models:
 - `workbench_dashboard`
 - `workbench_home_dashboard`
 - `workbench_player_detail`
-- `analysis_snapshots`
 
 Agent serving models:
 

@@ -163,7 +163,7 @@ def test_semantic_catalog_resolves_typo_aliases() -> None:
     assert catalog.resolve_metric("turnovers").key == "tov"
     points_created = catalog.resolve_metric("points + assists * 2")
     assert points_created.key == "points_created"
-    assert points_created.formula == "pts + ast * 2"
+    assert points_created.formula == "pts + 2 * ast"
     assert points_created.formula_variables == ("ast", "pts")
 
 
@@ -231,18 +231,18 @@ def test_agent_trends_tool_computes_points_created_from_game_log() -> None:
 
     assert payload["status"] == "ok"
     assert payload["trends"][0]["stat"] == "POINTS_CREATED"
-    assert payload["trends"][0]["formula"] == "PTS + AST * 2"
+    assert payload["trends"][0]["formula"] == "PTS + 2 * AST"
     assert payload["trends"][0]["recent_avg"] == 44.5
     assert payload["charts"][0]["series"][0]["points"] == [
         {
             "x": "2026-02-01",
             "y": 42.0,
-            "meta": "PHI vs. NYK W AST 7 · PTS 28 formula PTS + AST * 2",
+            "meta": "PHI vs. NYK W AST 7 · PTS 28 formula PTS + 2 * AST",
         },
         {
             "x": "2026-02-03",
             "y": 47.0,
-            "meta": "PHI @ BOS L AST 8 · PTS 31 formula PTS + AST * 2",
+            "meta": "PHI @ BOS L AST 8 · PTS 31 formula PTS + 2 * AST",
         },
     ]
 
@@ -763,3 +763,12 @@ def test_agent_calculates_points_created_percentile_alias() -> None:
     assert payload["metric"]["key"] == "points_created"
     assert payload["metric_value"] == 42.2
     assert payload["percentile"] == 94.0
+
+
+def test_legacy_metric_directions_follow_governed_contract():
+    from app.agent.semantics import load_contract
+
+    catalog = load_semantic_catalog()
+    contract = load_contract()
+    for key, metric in catalog.metrics.items():
+        assert metric.direction == contract.metrics[key].direction

@@ -33,7 +33,7 @@ player_dimension as (
         latest_team_abbr,
         position,
         last_seen_at_utc
-    from {{ ref('dim_player') }}
+    from {{ ref('player_search_index') }}
 ),
 availability as (
     select

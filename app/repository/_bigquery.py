@@ -67,7 +67,6 @@ from app.repository._helpers import (
     _weighted_similarity_vector,
     _window_reason,
     _window_state,
-    build_analysis_payload,
     build_headshot_url,
     build_player_initials,
     build_reason_summary,
@@ -1752,74 +1751,6 @@ class BigQueryWarehouseRepository:
             "neighbors": neighbors,
         }
 
-    def get_leaderboard(self, limit: int = 10) -> list[dict[str, Any]]:
-        table = f"`{self.settings.project_id}.{self.settings.gold_dataset}.daily_leaderboard`"
-        sql = f"""
-        SELECT
-          season,
-          game_date,
-          pts_leader,
-          pts_matchup,
-          pts,
-          reb_leader,
-          reb,
-          ast_leader,
-          ast
-        FROM {table}
-        WHERE season = @season
-        ORDER BY game_date DESC, pts DESC, pts_leader
-        LIMIT @limit
-        """
-        return self._query(
-            sql,
-            [
-                bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
-                bigquery.ScalarQueryParameter("limit", "INT64", limit),
-            ],
-        )
-
-    def get_trends(self, limit: int = 10) -> list[dict[str, Any]]:
-        return self._fetch_dashboard_rows(
-            limit=limit,
-            order_by="ABS(trend_delta) DESC, player_name",
-        )
-
-    def get_recommendations(
-        self, limit: int = 10, insight_type: str | None = None
-    ) -> list[dict[str, Any]]:
-        table = f"`{self.settings.project_id}.{self.settings.gold_dataset}.fantasy_insights`"
-        filters = ["season = @season"]
-        params: list[bigquery.ScalarQueryParameter] = [
-            bigquery.ScalarQueryParameter("season", "STRING", self.settings.season),
-            bigquery.ScalarQueryParameter("limit", "INT64", limit),
-        ]
-        if insight_type:
-            filters.append("insight_type = @insight_type")
-            params.append(
-                bigquery.ScalarQueryParameter("insight_type", "STRING", insight_type)
-            )
-        sql = f"""
-        SELECT
-          insight_id,
-          as_of_date,
-          player_id,
-          player_name,
-          insight_type,
-          priority_score,
-          confidence_score,
-          category_focus,
-          recommendation,
-          title,
-          summary,
-          evidence_json,
-          source_label
-        FROM {table}
-        WHERE {" AND ".join(filters)}
-        ORDER BY as_of_date DESC, priority_score DESC, confidence_score DESC, player_name
-        LIMIT @limit
-        """
-        return self._query(sql, params)
-
     def get_rankings(self, limit: int = 25) -> list[dict[str, Any]]:
         return self._fetch_dashboard_rows(
             limit=limit,
@@ -2158,62 +2089,6 @@ class BigQueryWarehouseRepository:
                 "player_b": build_side(player_b_id),
             },
         }
-
-    def get_latest_analysis(self) -> dict[str, Any] | None:
-        table = f"`{self.settings.project_id}.{self.settings.gold_dataset}.analysis_snapshots`"
-        sql = f"""
-        SELECT
-          snapshot_id,
-          snapshot_date,
-          created_at_utc,
-          season,
-          headline,
-          dek,
-          body,
-          trend_player,
-          trend_stat,
-          trend_delta,
-          contribution_player_id,
-          contribution_player_name,
-          contribution_team_abbr,
-          contribution_opponent_abbr,
-          contribution_matchup,
-          contribution_player_pts,
-          contribution_team_pts,
-          contribution_opponent_team_pts,
-          contribution_player_points_share_of_team,
-          contribution_player_points_share_of_game,
-          contribution_scoring_margin,
-          contribution_team_pts_qtr1,
-          contribution_team_pts_qtr2,
-          contribution_team_pts_qtr3,
-          contribution_team_pts_qtr4,
-          contribution_team_pts_ot_total,
-          contribution_game_date,
-          context_player_id,
-          context_player_name,
-          context_team_abbr,
-          context_team_name,
-          context_position,
-          context_height,
-          context_weight,
-          context_roster_status,
-          context_season_exp,
-          context_draft_year,
-          context_draft_round,
-          context_draft_number,
-          freshness_ts,
-          source_run_id
-        FROM {table}
-        WHERE season = @season
-        ORDER BY snapshot_date DESC, created_at_utc DESC, snapshot_id DESC
-        LIMIT 1
-        """
-        rows = self._query(
-            sql,
-            [bigquery.ScalarQueryParameter("season", "STRING", self.settings.season)],
-        )
-        return build_analysis_payload(rows[0]) if rows else None
 
     def get_latest_successful_run(self) -> dict[str, Any] | None:
         table = f"`{self.settings.project_id}.{self.settings.metadata_dataset}.pipeline_run_log`"

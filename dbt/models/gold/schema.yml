@@ -1,25 +1,5 @@
 version: 2
 
-sources:
-  - name: gold_runtime
-    database: "{{ env_var('BQ_PROJECT', env_var('GCP_PROJECT_ID', 'local-project')) }}"
-    schema: "{{ env_var('BQ_DATASET_GOLD', env_var('BQ_DATASET', 'nba_gold')) }}"
-    tables:
-      - name: analysis_snapshots
-        columns:
-          - name: snapshot_id
-            tests: [not_null]
-          - name: snapshot_date
-            tests: [not_null]
-          - name: season
-            tests:
-              - not_null
-              - accepted_values:
-                  arguments:
-                    values: ["{{ var('nba_season', '2025-26') }}"]
-          - name: source_run_id
-            tests: [not_null]
-
 models:
   - name: fct_player_game_stats
     columns:
@@ -279,18 +259,6 @@ models:
           - accepted_values:
               arguments:
                 values: ['available', 'probable', 'at_risk', 'unavailable', 'unknown']
-  - name: daily_leaderboard
-    columns:
-      - name: season
-        tests:
-          - not_null
-          - accepted_values:
-              arguments:
-                values: ["{{ var('nba_season', '2025-26') }}"]
-      - name: game_date
-        tests: [not_null]
-      - name: pts_leader
-        tests: [not_null]
   - name: player_recent_form
     columns:
       - name: player_id
@@ -512,24 +480,6 @@ models:
           - accepted_values:
               arguments:
                 values: ['strong_add', 'hold_or_stream', 'watchlist']
-  - name: fantasy_insights
-    columns:
-      - name: insight_id
-        tests: [not_null, unique]
-      - name: player_id
-        tests:
-          - not_null
-          - relationships:
-              arguments:
-                to: ref('dim_player')
-                field: player_id
-              config:
-                enabled: false
-      - name: insight_type
-        tests:
-          - accepted_values:
-              arguments:
-                values: ['hot_streak', 'minutes_spike', 'sell_high']
   - name: workbench_compare
     columns:
       - name: as_of_date

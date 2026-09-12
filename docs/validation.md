@@ -65,8 +65,7 @@ python -m dotenv run --no-override -- .venv-airflow/bin/python scripts/backfill_
 ```
 
 ```bash
-dbt test --project-dir . --profiles-dir dbt/profiles --target dev \
-  --exclude source:gold_runtime.analysis_snapshots path:dbt/tests/no_duplicate_analysis_snapshots.sql
+dbt test --project-dir . --profiles-dir dbt/profiles --target dev
 ```
 
 Validate core serving dependencies:

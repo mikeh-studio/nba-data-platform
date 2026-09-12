@@ -128,55 +128,6 @@ class FakeRepository(WarehouseRepository):
             ],
         }
 
-    def get_leaderboard(self, limit: int = 10) -> list[dict]:
-        return [
-            {
-                "season": "2025-26",
-                "game_date": "2026-02-10",
-                "pts_leader": "Jayson Tatum",
-                "pts_matchup": "BOS vs. NYK",
-                "pts": 34,
-                "reb_leader": "Karl-Anthony Towns",
-                "reb": 14,
-                "ast_leader": "Trae Young",
-                "ast": 11,
-            }
-        ][:limit]
-
-    def get_trends(self, limit: int = 10) -> list[dict]:
-        return [
-            {
-                "season": "2025-26",
-                "player_id": 7,
-                "player_name": "Tyrese Maxey",
-                "trend_status": "rising",
-                "trend_delta": 6.4,
-                "reason_summary": "recent box score production: +5.2",
-            }
-        ][:limit]
-
-    def get_recommendations(
-        self, limit: int = 10, insight_type: str | None = None
-    ) -> list[dict]:
-        items = [
-            {
-                "insight_id": "insight_1",
-                "as_of_date": "2026-02-11",
-                "player_id": 7,
-                "player_name": "Tyrese Maxey",
-                "insight_type": "waiver_add",
-                "priority_score": 94.0,
-                "confidence_score": 88.0,
-                "category_focus": "PTS, AST, 3PM",
-                "recommendation": "add",
-                "title": "Tyrese Maxey is a high-priority add",
-                "summary": "Minutes and assist creation are both trending up.",
-            }
-        ]
-        if insight_type:
-            items = [item for item in items if item["insight_type"] == insight_type]
-        return items[:limit]
-
     def get_rankings(self, limit: int = 25) -> list[dict]:
         return [
             {
@@ -1133,55 +1084,6 @@ class FakeRepository(WarehouseRepository):
                     "metric_rows": metric_rows(player_b_metrics),
                 },
             },
-        }
-
-    def get_latest_analysis(self) -> dict | None:
-        return {
-            "snapshot_id": "202526_20260211",
-            "snapshot_date": "2026-02-11",
-            "created_at_utc": "2026-02-11T01:02:03+00:00",
-            "season": "2025-26",
-            "headline": "Tyrese Maxey headlines the 2025-26 trend watch",
-            "dek": "Latest leaders from 2026-02-10 are anchored by Jayson Tatum in scoring.",
-            "body": "Deterministic analysis body.",
-            "trend_player": "Tyrese Maxey",
-            "trend_stat": "PTS",
-            "trend_delta": 6.4,
-            "score_contribution": {
-                "player_id": 7,
-                "player_name": "Tyrese Maxey",
-                "team_abbr": "PHI",
-                "opponent_abbr": "NYK",
-                "matchup": "PHI vs. NYK",
-                "player_pts": 31,
-                "team_pts": 112,
-                "opponent_team_pts": 108,
-                "player_points_share_of_team": 0.2768,
-                "player_points_share_of_game": 0.1416,
-                "scoring_margin": 4,
-                "team_pts_qtr1": 28,
-                "team_pts_qtr2": 24,
-                "team_pts_qtr3": 30,
-                "team_pts_qtr4": 30,
-                "team_pts_ot_total": 0,
-                "game_date": "2026-02-10",
-            },
-            "player_context": {
-                "player_id": 7,
-                "player_name": "Tyrese Maxey",
-                "team_abbr": "PHI",
-                "team_name": "76ers",
-                "position": "G",
-                "height": "6-2",
-                "weight": 200,
-                "roster_status": True,
-                "season_exp": 5,
-                "draft_year": "2020",
-                "draft_round": "1",
-                "draft_number": "21",
-            },
-            "freshness_ts": "2026-02-10T13:00:00+00:00",
-            "source_run_id": "manual__2026-02-11T01:02:03+00:00",
         }
 
     def get_latest_successful_run(self) -> dict | None:
@@ -2172,22 +2074,6 @@ def test_api_health_smoke() -> None:
     assert "latest_successful_run" not in payload
 
 
-def test_api_analysis_latest_includes_structured_sections() -> None:
-    client = build_client()
-    response = client.get("/api/analysis/latest")
-
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["season"] == "2025-26"
-    assert payload["item"]["trend_player"] == "Tyrese Maxey"
-    assert (
-        payload["item"]["score_contribution"]["player_points_share_of_team"] == 0.2768
-    )
-    assert payload["item"]["score_contribution"]["team_pts_qtr4"] == 30
-    assert payload["item"]["player_context"]["position"] == "G"
-    assert payload["item"]["player_context"]["roster_status"] is True
-
-
 def test_api_player_search_rejects_blank_query() -> None:
     client = build_client()
     response = client.get("/api/players/search?q=%20%20%20")
@@ -2873,3 +2759,14 @@ def test_untrusted_client_cannot_bypass_limit_by_rotating_forwarded_header():
         ).status_code
         == 429
     )
+
+
+def test_retired_legacy_analytics_endpoints_are_absent():
+    client = build_client()
+    for path in (
+        "/api/leaderboard",
+        "/api/trends",
+        "/api/analysis/latest",
+        "/api/recommendations",
+    ):
+        assert client.get(path).status_code == 404

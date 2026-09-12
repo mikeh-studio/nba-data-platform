@@ -384,3 +384,12 @@ def test_game_log_phase_team_and_partial_window(evidence):
     assert [r["game_id"] for r in result["rows"]] == ["001", "002", "003"]
     assert "partial_window" in result["warnings"]
     assert all(r["season_type"] == "Regular Season" for r in result["rows"])
+
+
+def test_query_phase_default_comes_from_contract(monkeypatch):
+    from app.agent import semantics
+
+    contract = replace(load_contract(), default_phase="Playoffs")
+    monkeypatch.setattr(semantics, "load_contract", lambda: contract)
+    assert Query("pts", "2024-25", "average").season_type == "Playoffs"
+    assert Query("pts", "2024-25", "average", season_type="Both").season_type == "Both"

@@ -53,6 +53,7 @@ from app.seasons import (
     settings_for_season,
     validate_season,
 )
+from app.security import rate_limit_identity, require_local_history
 from app.telemetry import instrument_compare_view, instrument_player_view
 from app.what_changed import ComparisonPeriod, SeasonPhase, WhatChangedUnavailable
 
@@ -347,25 +348,15 @@ def _get_cached_player_detail(
     )
 
 
-def _agent_rate_limit_key(request: Request) -> str:
-    # Cloud Run appends the connecting client's IP as the right-most
-    # X-Forwarded-For entry; anything left of it is client-supplied and
-    # spoofable, so only the right-most hop can be trusted for limiting.
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        last_hop = forwarded_for.rsplit(",", 1)[-1].strip()
-        if last_hop:
-            return last_hop
-    if request.client is not None:
-        return request.client.host
-    return "unknown"
+def _agent_rate_limit_key(request: Request, settings: Settings) -> str:
+    return rate_limit_identity(request, settings.agent_trusted_proxy_cidrs)
 
 
 def _check_agent_rate_limit(request: Request, settings: Settings) -> None:
     if not settings.openai_agent_enabled:
         return
 
-    key = _agent_rate_limit_key(request)
+    key = _agent_rate_limit_key(request, settings)
     limiter = get_agent_rate_limiter(settings.agent_rate_limit_redis_url)
     decision = limiter.check(
         key=key,
@@ -451,6 +442,7 @@ def _prepare_agent_request(
     payload: AgentAskRequest,
     settings: Settings,
 ) -> tuple[str, str, str, AgentTrace]:
+    require_local_history(request, settings)
     request_id = _request_id(request)
     conversation_id = _conversation_id(payload.conversation_id)
     requested_model = (payload.model or "").strip()
@@ -975,9 +967,11 @@ def api_agent_ask_stream(
 
 @app.get("/api/agent/history")
 def api_agent_history(
+    request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
     limit: int = Query(default=25, ge=1, le=100),
 ) -> dict:
+    require_local_history(request, settings)
     if not settings.agent_history_enabled:
         return {"conversations": []}
     return read_history(
@@ -987,8 +981,10 @@ def api_agent_history(
 
 @app.delete("/api/agent/history")
 def api_agent_history_clear(
+    request: Request,
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> dict:
+    require_local_history(request, settings)
     if settings.agent_history_enabled:
         clear_history(
             settings_for_season(settings, current_season()).agent_history_path

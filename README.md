@@ -180,7 +180,7 @@ DBT_TARGET=dev
 Run the app locally:
 
 ```bash
-uvicorn app.main:app --host 0.0.0.0 --port 8001
+uvicorn app.main:app --host 127.0.0.1 --port 8001 --no-proxy-headers
 ```
 
 App URL: `http://localhost:8001`

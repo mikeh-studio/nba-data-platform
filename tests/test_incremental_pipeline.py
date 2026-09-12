@@ -2699,3 +2699,33 @@ def test_create_similarity_mlops_tables_defines_lifecycle_contract():
     drift_checks = tables["demo.nba_ml.similarity_drift_checks"]
     assert drift_checks.time_partitioning.field == "checked_at_utc"
     assert drift_checks.clustering_fields == ["season", "model_run_id", "status"]
+
+
+def test_injury_pdf_extraction_reads_compressed_text_with_current_pypdf():
+    from io import BytesIO
+
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=612, height=792)
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    page[NameObject("/Resources")] = DictionaryObject(
+        {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})}
+    )
+    text = DecodedStreamObject()
+    text.set_data(
+        b"BT /F1 12 Tf 50 700 Td (Injury Report: 05/06/26 05:00 PM) Tj 0 -20 Td (Embiid, Joel Out) Tj ET"
+    )
+    page[NameObject("/Contents")] = writer._add_object(text.flate_encode())
+    buffer = BytesIO()
+    writer.write(buffer)
+    extracted = pipeline.extract_text_from_injury_report_pdf(buffer.getvalue())
+    assert "Injury Report: 05/06/26 05:00 PM" in extracted
+    assert "Embiid, Joel Out" in extracted

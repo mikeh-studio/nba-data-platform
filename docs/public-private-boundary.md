@@ -47,3 +47,25 @@ nba-personal-model/
 Keep any local bridge scripts ignored until they are safe to publish.
 Keep `AGENT_HISTORY_ENABLED=false` for public deployments unless the endpoint is
 put behind a real auth boundary.
+
+## Enforced Ask ingress boundaries
+
+`AGENT_HISTORY_ENABLED=true` is a direct-localhost mode: Ask JSON/SSE and history
+read/delete requests require a loopback socket peer, a localhost Host, no proxy
+forwarding headers and, when supplied, a same-origin Origin. Remote/proxied
+requests receive 403 before Ask generation or history mutation. Browser history
+still works independently when server history is disabled. This is not multi-user
+authentication; keep server history disabled for public deployments.
+
+Run `python -m app` or pass `--no-proxy-headers` to Uvicorn. The application must
+receive the original socket peer, not a client address already rewritten by the
+server. By default, rate limiting ignores X-Forwarded-For. Set
+`AGENT_TRUSTED_PROXY_CIDRS` to specific ingress network CIDRs only when deploying
+behind a verified proxy; the app walks the forwarded chain from right to left and
+uses the first untrusted hop. Malformed/duplicate/oversized headers fall back to
+the socket peer. Universal trust networks are rejected. Confirm the actual ingress
+network and header-appending behavior; do not copy a generic Cloud Run trust range.
+
+The default in-memory limiter remains per process. Public multi-instance serving
+should use the existing Redis limiter for shared counters. These changes do not
+introduce user authentication or resolve the remaining dependency advisories.

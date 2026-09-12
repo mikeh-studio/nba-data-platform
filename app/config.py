@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from datetime import date
+from ipaddress import ip_network
 
 from dotenv import load_dotenv
 
@@ -84,6 +85,7 @@ class Settings:
     agent_rate_limit_per_minute: int = 12
     agent_rate_limit_daily: int = 200
     agent_rate_limit_redis_url: str | None = None
+    agent_trusted_proxy_cidrs: tuple[str, ...] = ()
     agent_conversation_max_turns: int = 6
     agent_cache_ttl_seconds: int = 300
     agent_history_enabled: bool = False
@@ -91,6 +93,12 @@ class Settings:
     performance_cache_prewarm_enabled: bool = True
     freshness_offseason_start: date = date(2026, 6, 20)
     next_regular_season_start: date = date(2026, 10, 20)
+
+    def __post_init__(self) -> None:
+        for value in self.agent_trusted_proxy_cidrs:
+            network = ip_network(value)
+            if network.prefixlen == 0:
+                raise ValueError("Trust specific proxy networks, not every address")
 
 
 def get_settings() -> Settings:
@@ -138,6 +146,11 @@ def get_settings() -> Settings:
         agent_rate_limit_per_minute=int(os.getenv("AGENT_RATE_LIMIT_PER_MINUTE", "12")),
         agent_rate_limit_daily=int(os.getenv("AGENT_RATE_LIMIT_DAILY", "200")),
         agent_rate_limit_redis_url=os.getenv("AGENT_RATE_LIMIT_REDIS_URL") or None,
+        agent_trusted_proxy_cidrs=tuple(
+            value.strip()
+            for value in os.getenv("AGENT_TRUSTED_PROXY_CIDRS", "").split(",")
+            if value.strip()
+        ),
         agent_conversation_max_turns=int(
             os.getenv("AGENT_CONVERSATION_MAX_TURNS", "6")
         ),

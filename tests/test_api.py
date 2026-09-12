@@ -1551,6 +1551,8 @@ def build_client(
         app.dependency_overrides[get_settings] = lambda: settings
     if agent_client is not None:
         app.dependency_overrides[get_agent_client] = lambda: agent_client
+    if settings and settings.agent_history_enabled:
+        return TestClient(app, base_url="http://localhost", client=("127.0.0.1", 50000))
     return TestClient(app)
 
 
@@ -1858,6 +1860,7 @@ def test_api_agent_ask_rate_limits_repeated_public_calls() -> None:
         ),
         agent_client=fake_openai,
     )
+    client = TestClient(app, client=("198.51.100.23", 50000))
     headers = {"X-Forwarded-For": "198.51.100.23"}
 
     first = client.post(
@@ -1883,10 +1886,12 @@ def test_api_agent_ask_rate_limit_ignores_spoofed_forwarded_prefix() -> None:
         settings=_test_settings(
             openai_api_key="test-key",
             agent_rate_limit_per_minute=1,
+            agent_trusted_proxy_cidrs=("10.0.0.0/24",),
         ),
         agent_client=fake_openai,
     )
 
+    client = TestClient(app, client=("10.0.0.5", 50000))
     first = client.post(
         "/api/agent/ask",
         json={"question": "How is Tyrese Maxey trending?"},
@@ -1948,6 +1953,7 @@ def test_api_agent_ask_enforces_daily_rate_limit() -> None:
         ),
         agent_client=fake_openai,
     )
+    client = TestClient(app, client=("198.51.100.24", 50000))
     headers = {"X-Forwarded-For": "198.51.100.24"}
 
     first = client.post(
@@ -2814,3 +2820,56 @@ def test_what_changed_source_failure_is_not_a_partial_league_ranking():
     response = build_client(MissingRepository()).get("/api/what-changed")
     assert response.status_code == 503
     assert "private warehouse diagnostic" not in response.text
+
+
+def test_remote_client_cannot_read_clear_or_append_server_history(tmp_path):
+    history_path = tmp_path / "history.jsonl"
+    history_path.write_text('{"synthetic":"private"}\n')
+    build_client(
+        settings=_test_settings(
+            openai_api_key="test-key",
+            agent_history_enabled=True,
+            agent_history_path=str(history_path),
+        ),
+        agent_client=FakeOpenAIClient(),
+    )
+    remote = TestClient(app, base_url="http://localhost", client=("192.0.2.9", 4000))
+    for method, path, body in [
+        ("GET", "/api/agent/history", None),
+        ("DELETE", "/api/agent/history", None),
+        ("POST", "/api/agent/ask", {"question": "Tyrese Maxey points?"}),
+        ("POST", "/api/agent/ask/stream", {"question": "Tyrese Maxey points?"}),
+    ]:
+        assert (
+            remote.request(
+                method, path, json=body, headers={"X-Forwarded-For": "127.0.0.1"}
+            ).status_code
+            == 403
+        )
+    assert history_path.read_text() == '{"synthetic":"private"}\n'
+
+
+def test_untrusted_client_cannot_bypass_limit_by_rotating_forwarded_header():
+    build_client(
+        settings=_test_settings(
+            openai_api_key="test-key", agent_rate_limit_per_minute=1
+        ),
+        agent_client=FakeOpenAIClient(),
+    )
+    remote = TestClient(app, client=("192.0.2.77", 50000))
+    assert (
+        remote.post(
+            "/api/agent/ask",
+            json={"question": "Tyrese Maxey points?"},
+            headers={"X-Forwarded-For": "198.51.100.91"},
+        ).status_code
+        == 200
+    )
+    assert (
+        remote.post(
+            "/api/agent/ask",
+            json={"question": "Tyrese Maxey points?"},
+            headers={"X-Forwarded-For": "198.51.100.92"},
+        ).status_code
+        == 429
+    )

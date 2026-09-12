@@ -5,7 +5,7 @@ The first executable implementation of `nba_semantics/0.1` is available on
 calculations, bounded warehouse capture, natural-language planning, and independent
 evaluations. The local BigQuery-backed Ask JSON and streaming routes now use this
 contract for governed metric queries. No new physical tables were created. These
-changes have not been deployed; the existing non-Ask metric catalog is unchanged.
+changes have not been deployed; legacy metric presentation metadata uses the governed formulas and directions.
 
 The [original proposal](semantic-contract-v0.1.md) remains the design reference.
 Passing this bounded suite does not satisfy every proposed production release gate.

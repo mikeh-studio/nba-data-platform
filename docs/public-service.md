@@ -18,11 +18,7 @@ old Visualize page has been removed.
 
 ## JSON Routes
 
-- `/api/leaderboard`
 - `/api/what-changed` (`period=four_games|week`, `season_type=Regular Season|Playoffs`, optional `as_of=YYYY-MM-DD`)
-- `/api/trends`
-- `/api/analysis/latest`
-- `/api/recommendations`
 - `/api/rankings`
 - `/api/players/search`
 - `/api/players/{player_id}`

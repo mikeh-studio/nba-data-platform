@@ -63,7 +63,6 @@ def publication_details(result: dict) -> str:
     statuses = [
         injury,
         result.get("similarity_status"),
-        result.get("analysis_snapshot_status"),
     ]
     overall = "partially_updated" if "failed_non_blocking" in statuses else "success"
     return (

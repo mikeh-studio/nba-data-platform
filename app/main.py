@@ -494,37 +494,6 @@ def _record_agent_history(
     )
 
 
-@app.get("/api/leaderboard")
-def api_leaderboard(
-    repo: Annotated[WarehouseRepository, Depends(get_repository)],
-) -> dict:
-    return {"season": current_season(), "items": repo.get_leaderboard()}
-
-
-@app.get("/api/trends")
-def api_trends(repo: Annotated[WarehouseRepository, Depends(get_repository)]) -> dict:
-    return {"season": current_season(), "items": repo.get_trends()}
-
-
-@app.get("/api/analysis/latest")
-def api_analysis_latest(
-    repo: Annotated[WarehouseRepository, Depends(get_repository)],
-) -> dict:
-    return {"season": current_season(), "item": repo.get_latest_analysis()}
-
-
-@app.get("/api/recommendations")
-def api_recommendations(
-    repo: Annotated[WarehouseRepository, Depends(get_repository)],
-    limit: int = Query(10, ge=1, le=50),
-    insight_type: str | None = Query(default=None),
-) -> dict:
-    return {
-        "season": current_season(),
-        "items": repo.get_recommendations(limit=limit, insight_type=insight_type),
-    }
-
-
 @app.get("/api/rankings")
 def api_rankings(
     repo: Annotated[WarehouseRepository, Depends(get_repository)],

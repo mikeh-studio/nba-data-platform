@@ -75,8 +75,6 @@ class MetricDefinition:
     aliases: tuple[str, ...]
     game_log_key: str
     trend_stat: str
-    detail_average_key: str | None
-    baseline_key: str | None
     percentile_key: str | None
     leaderboard_column: str
     direction: str
@@ -91,10 +89,6 @@ class MetricDefinition:
     @property
     def higher_is_better(self) -> bool:
         return self.direction != "lower"
-
-    @property
-    def is_derived(self) -> bool:
-        return self.formula is not None
 
     @property
     def formula_variables(self) -> tuple[str, ...]:
@@ -194,9 +188,19 @@ class SemanticCatalog:
 def load_semantic_catalog(path: str | Path = CATALOG_PATH) -> SemanticCatalog:
     with Path(path).open("r", encoding="utf-8") as handle:
         raw = yaml.safe_load(handle) or {}
+    from app.agent.semantics import CATALOG_PATH as CONTRACT_PATH
+
+    definitions = yaml.safe_load(CONTRACT_PATH.read_text())["metrics"]
     metrics: dict[str, MetricDefinition] = {}
     for key, config in (raw.get("metrics") or {}).items():
-        formula = config.get("formula") or None
+        definition = definitions[key]
+        formula = None
+        if "game_log_key" not in config or definition.get("legacy_formula"):
+            numerator = definition["numerator"]
+            denominator = definition.get("denominator")
+            formula = definition.get("legacy_formula") or (
+                f"({numerator}) / ({denominator}) * 100" if denominator else numerator
+            )
         if formula is not None:
             extract_formula_variables(str(formula))
         metrics[str(key)] = MetricDefinition(
@@ -206,11 +210,9 @@ def load_semantic_catalog(path: str | Path = CATALOG_PATH) -> SemanticCatalog:
             aliases=tuple(str(item) for item in config.get("aliases", [])),
             game_log_key=str(config.get("game_log_key") or key),
             trend_stat=str(config["trend_stat"]),
-            detail_average_key=config.get("detail_average_key") or None,
-            baseline_key=config.get("baseline_key") or None,
             percentile_key=config.get("percentile_key") or None,
             leaderboard_column=str(config.get("leaderboard_column") or ""),
-            direction=str(config["direction"]),
+            direction=str(definition["direction"]),
             formula=str(formula) if formula is not None else None,
             # Untiered metrics fall to the lowest priority so they never leak
             # into the default cohort by accident.

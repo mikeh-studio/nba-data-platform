@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import asdict, dataclass
+from dataclasses import field as dataclass_field
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -192,7 +193,9 @@ class Query:
     metric: str
     season: str
     aggregation: str
-    season_type: str = "Regular Season"
+    season_type: str = dataclass_field(
+        default_factory=lambda: load_contract().default_phase
+    )
     operation: str = "summary"
     as_of: str | None = None
     window: str = "season_to_date"

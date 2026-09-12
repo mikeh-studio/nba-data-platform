@@ -28,10 +28,6 @@ DEFAULT_DBT_SELECTOR = [
     "stg_player_injury_reports_clean",
     "player_availability_current",
 ]
-DEFAULT_DBT_EXCLUDES = [
-    "source:gold_runtime.analysis_snapshots",
-    "path:dbt/tests/no_duplicate_analysis_snapshots.sql",
-]
 SECRET_KEY_PATTERN = (
     r"password|passwd|pwd|token|secret|api[_-]?key|access[_-]?key|"
     r"secret[_-]?key|private[_-]?key|client[_-]?secret|credential"
@@ -271,8 +267,6 @@ def run_dbt_injury_build(
         str(root / "dbt" / "profiles"),
         "--target",
         target,
-        "--exclude",
-        *DEFAULT_DBT_EXCLUDES,
         "--select",
         *DEFAULT_DBT_SELECTOR,
     ]

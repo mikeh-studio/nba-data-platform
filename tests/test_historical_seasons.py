@@ -106,7 +106,7 @@ def test_request_seasons_are_isolated_and_validated(monkeypatch):
         main,
         "_cached_repository",
         lambda config: SimpleNamespace(
-            get_trends=lambda: [
+            get_rankings=lambda **kwargs: [
                 {"season": config.season, "dataset": config.gold_dataset}
             ]
         ),
@@ -115,7 +115,7 @@ def test_request_seasons_are_isolated_and_validated(monkeypatch):
         client = TestClient(app)
 
         def read(season):
-            payload = client.get(f"/api/trends?season={season}").json()
+            payload = client.get(f"/api/rankings?season={season}").json()
             assert payload["season"] == season
             assert payload["items"][0]["season"] == season
             return payload
@@ -123,8 +123,8 @@ def test_request_seasons_are_isolated_and_validated(monkeypatch):
         with ThreadPoolExecutor(max_workers=3) as pool:
             results = list(pool.map(read, ["2023-24", "2024-25", "2025-26"] * 3))
         assert results[0]["items"][0]["dataset"] == "gold_2023_24"
-        assert client.get("/api/trends?season=2022-23").status_code == 422
-        assert client.get("/api/trends").json()["season"] == "2025-26"
+        assert client.get("/api/rankings?season=2022-23").status_code == 422
+        assert client.get("/api/rankings").json()["season"] == "2025-26"
         assert current_season() == "2025-26"
         page = client.get("/performance?season=2023-24")
         assert page.status_code == 200

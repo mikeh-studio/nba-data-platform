@@ -5,11 +5,8 @@ metrics:
     aliases: [points, point, ppg, scoring]
     game_log_key: pts
     trend_stat: PTS
-    detail_average_key: season_avg_pts
-    baseline_key: league_avg_pts
     percentile_key: pts_percentile
     leaderboard_column: avg_pts
-    direction: higher
     tier: 1
   reb:
     label: REB
@@ -17,11 +14,8 @@ metrics:
     aliases: [rebounds, rebound, rbs, boards]
     game_log_key: reb
     trend_stat: REB
-    detail_average_key: season_avg_reb
-    baseline_key: league_avg_reb
     percentile_key: reb_percentile
     leaderboard_column: avg_reb
-    direction: higher
     tier: 1
   ast:
     label: AST
@@ -29,11 +23,8 @@ metrics:
     aliases: [assists, assist, playmaking]
     game_log_key: ast
     trend_stat: AST
-    detail_average_key: season_avg_ast
-    baseline_key: league_avg_ast
     percentile_key: ast_percentile
     leaderboard_column: avg_ast
-    direction: higher
     tier: 1
   stl:
     label: STL
@@ -41,11 +32,8 @@ metrics:
     aliases: [steals, steal]
     game_log_key: stl
     trend_stat: STL
-    detail_average_key: season_avg_stl
-    baseline_key: league_avg_stl
     percentile_key: stl_percentile
     leaderboard_column: avg_stl
-    direction: higher
     tier: 2
   blk:
     label: BLK
@@ -53,11 +41,8 @@ metrics:
     aliases: [blocks, block, blcks]
     game_log_key: blk
     trend_stat: BLK
-    detail_average_key: season_avg_blk
-    baseline_key: league_avg_blk
     percentile_key: blk_percentile
     leaderboard_column: avg_blk
-    direction: higher
     tier: 2
   tov:
     label: TOV
@@ -65,11 +50,8 @@ metrics:
     aliases: [turnovers, turnover, tos, ball_security]
     game_log_key: tov
     trend_stat: TOV
-    detail_average_key: season_avg_tov
-    baseline_key: league_avg_tov
     percentile_key: tov_percentile
     leaderboard_column: avg_tov
-    direction: lower
     tier: 2
   fg3m:
     label: 3PM
@@ -77,11 +59,8 @@ metrics:
     aliases: [threes, three_pointers, 3pm, three_point_makes]
     game_log_key: fg3m
     trend_stat: FG3M
-    detail_average_key: season_avg_fg3m
-    baseline_key:
     percentile_key:
     leaderboard_column: avg_fg3m
-    direction: higher
     tier: 3
   min:
     label: MIN
@@ -89,11 +68,8 @@ metrics:
     aliases: [minutes, playing_time, mpg]
     game_log_key: min
     trend_stat: MIN
-    detail_average_key:
-    baseline_key:
     percentile_key:
     leaderboard_column: avg_min
-    direction: higher
     tier: 3
   fantasy_points_simple:
     label: BSI
@@ -101,62 +77,43 @@ metrics:
     aliases: [fantasy, fantasy_proxy, box_score_index, bsi]
     game_log_key: fantasy_points_simple
     trend_stat: FANTASY_POINTS_SIMPLE
-    detail_average_key:
-    baseline_key:
     percentile_key:
     leaderboard_column: avg_fantasy_points_simple
-    direction: higher
     tier: 4
   points_created:
     label: Attributed Points
     description: Derived offensive points estimate calculated as PTS + AST * 2.
     aliases: [points_created, points_attributed, attributed_points, points_plus_assists_times_two, points + assists * 2, pts_plus_ast_x2]
-    formula: "pts + ast * 2"
     trend_stat: POINTS_CREATED
-    detail_average_key:
-    baseline_key:
     percentile_key:
     leaderboard_column:
-    direction: higher
     tier: 4
   fg_pct:
     label: FG%
     description: Field-goal percentage per game, made field goals over attempts.
     aliases: [field goal percentage, fg percentage, shooting percentage, fg pct]
     game_log_key: fg_pct
-    formula: "fg_pct * 100"
     trend_stat: FG_PCT
-    detail_average_key:
-    baseline_key:
     percentile_key:
     leaderboard_column:
-    direction: higher
     unit: percent
     tier: 3
   fg3_pct:
     label: 3P%
     description: Three-point percentage per game, made threes over three-point attempts.
     aliases: [three point percentage, 3p percentage, three pt percentage, 3pt pct, 3p pct]
-    formula: "fg3m / fg3a * 100"
     trend_stat: FG3_PCT
-    detail_average_key:
-    baseline_key:
     percentile_key:
     leaderboard_column:
-    direction: higher
     unit: percent
     tier: 3
   ts_pct:
     label: TS%
     description: True shooting percentage = points / (2 * (FGA + 0.44 * FTA)).
     aliases: [true shooting, true shooting percentage, ts percentage, ts pct]
-    formula: "pts / (2 * (fga + 0.44 * fta)) * 100"
     trend_stat: TS_PCT
-    detail_average_key:
-    baseline_key:
     percentile_key:
     leaderboard_column:
-    direction: higher
     unit: percent
     tier: 3
   plus_minus:
@@ -165,9 +122,6 @@ metrics:
     aliases: [plus minus, plusminus, plus/minus, impact, net points]
     game_log_key: plus_minus
     trend_stat: PLUS_MINUS
-    detail_average_key:
-    baseline_key:
     percentile_key:
     leaderboard_column:
-    direction: higher
     tier: 3
